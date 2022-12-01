@@ -1,0 +1,6 @@
+===> multitime results
+1: ./1.out input.txt
+            Mean        Std.Dev.    Min         Median      Max
+real        0.018       0.006       0.009       0.016       0.029
+user        0.000       0.000       0.000       0.000       0.000
+sys         0.005       0.007       0.000       0.000       0.016

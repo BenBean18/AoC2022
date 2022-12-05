@@ -25,10 +25,10 @@ executable AoC2022
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
-    other-modules:    Day4, Utilities
+    other-modules:    Day4, Day5, Utilities
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
-    build-depends:    base ^>=4.16.4.0, text ^>=1.2.5.0, regex-pcre-builtin, regex-base
+    build-depends:    base ^>=4.16.4.0, text ^>=1.2.5.0, regex-pcre-builtin, regex-base, containers
     hs-source-dirs:   src
     default-language: Haskell2010

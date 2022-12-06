@@ -44,7 +44,6 @@ are always fast according to https://wiki.haskell.org/How_to_work_on_lists#Fast_
 drop n list gets slower as n gets bigger, but n is always one, so I think it's fine.
 I guess the standard implementation might be a bit faster because it's running
 `elem` on the list of things it's seen so far, not the entire list?
-
 -}
 
 -- Parameters: <how long chunks are> <list> <index of start of current chunk>
@@ -76,7 +75,7 @@ part1 = do
 
 -- Part 2 -- need to find the first chunk of 14 unique characters
 part2 = do
-    lines <- getLines "day6/long_input.txt" -- read input
+    lines <- getLines "day6/input.txt" -- read input
     if length lines < 1 then putStrLn "Invalid input!" -- if less than 1 line, it's invalid
     else print $ findFirstUniqueIndex 14 (lines !! 0) -- otherwise, print the first unique
     -- chunk of 14 characters long in the first line

@@ -1,0 +1,16 @@
+    [C]             [L]         [T]
+    [@] [#] [^]     [T]         [N]
+    [F] [G] [$] [%] [F]         [H]
+    [W] [L] [P] [V] [M] [V]     [F]
+    [P] [C] [W] [S] [Z] [&] [*] [P]
+[!] [R] [M] [B] [F] [J] [S] [Z] [D]
+[(] [L] [P] [F] [C] [H] [F] [J] [C]
+[Z] [Q] [F] [L] [G] [W] [H] [F] [M]
+ 1   2   3   4   5   6   7   8   9 
+
+move 1 from 3 to 2
+move 2 from 2 to 3
+move 1 from 4 to 6
+move 1 from 7 to 9
+move 2 from 1 to 9
+move 1 from 9 to 1

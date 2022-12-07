@@ -2,6 +2,7 @@
 *.hi
 *.o
 *.out
+input.txt
 
 .cabal-sandbox/
 cabal.sandbox.config

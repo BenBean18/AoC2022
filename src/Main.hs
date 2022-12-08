@@ -5,6 +5,7 @@ import qualified Day4
 import qualified Day5
 import qualified Day6
 import qualified Day7
+import qualified Day8
 
 main :: IO ()
 main = do
@@ -17,6 +18,7 @@ main = do
                     else if day == 5 then Day5.part1
                     else if day == 6 then Day6.part1
                     else if day == 7 then Day7.part1
+                    else if day == 8 then Day8.part1
                     else putStrLn "I haven't solved that yet (or it doesn't exist)"
                 else if part == "2" then
                     if day == 4 then Day4.part2

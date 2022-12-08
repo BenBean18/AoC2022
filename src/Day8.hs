@@ -59,3 +59,57 @@ part1 = do
     let rowSet = findAllRowIndices (tail (init lines)) 1 Set.empty
     let colSet = findAllColIndices (tail (init (List.transpose lines))) 1 Set.empty
     print $ (length (Set.union rowSet colSet)) + (length lines) * 2 + (length (lines !! 0)) * 2 - 4 -- -4 to account for corners
+
+-- Part 2
+
+-- To get the distance before blockage:
+-- let list = [1,2,3,2,5]
+-- Left:
+--  check index 2, for example
+--  let b = (reverse (take (n+1) list)) == [3,2,1]
+--  
+
+-- max == head list
+-- pass tail list to maximumDescent'
+maximumDescent' :: (Ord a) => [a] -> Int -> a -> Int
+maximumDescent' [] count max = count
+maximumDescent' list count max =
+    if head list >= max then count + 1 -- last tree
+    else maximumDescent' (tail list) (count + 1) max
+
+maximumDescent :: (Ord a) => [a] -> Int
+maximumDescent list = maximumDescent' (tail list) 0 (head list)
+
+getLeftViewDist :: (Ord a) => [a] -> Int -> Int
+getLeftViewDist list index = maximumDescent (reverse (take (index + 1) list))
+
+getRightViewDist :: (Ord a) => [a] -> Int -> Int
+getRightViewDist list index = maximumDescent (drop index list)
+
+-- left right can be used for down up
+
+getScenicScore :: (Ord a) => [[a]] -> Point -> Int
+getScenicScore list pt =
+    let lvd = getLeftViewDist (list !! (y pt)) (x pt)
+        rvd = getRightViewDist (list !! (y pt)) (x pt)
+        tlist = List.transpose list
+        tvd = getLeftViewDist (tlist !! (x pt)) (y pt)
+        bvd = getRightViewDist (tlist !! (x pt)) (y pt) in
+            lvd * rvd * tvd * bvd
+
+findMaxScenicScoreAlongX :: (Ord a) => [[a]] -> Int -> Int -> Int -> Int
+findMaxScenicScoreAlongX list x y maxValue =
+    if x == (length (list !! y) - 1) then maxValue
+    else findMaxScenicScoreAlongX list (x+1) y (max maxValue (getScenicScore list (Point { x = x, y = y })))
+
+findMaxScenicScore' :: (Ord a) => [[a]] -> Int -> Int -> Int
+findMaxScenicScore' list y maxValue =
+    if y == (length list - 1) then maxValue
+    else findMaxScenicScore' list (y+1) (max maxValue (findMaxScenicScoreAlongX list 0 y 0))
+
+findMaxScenicScore :: (Ord a) => [[a]] -> Int
+findMaxScenicScore list = findMaxScenicScore' list 0 0
+
+part2 = do
+    lines <- getLines "day8/input.txt"
+    print $ findMaxScenicScore lines

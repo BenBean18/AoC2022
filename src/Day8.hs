@@ -88,27 +88,26 @@ getRightViewDist list index = maximumDescent (drop index list)
 
 -- left right can be used for down up
 
-getScenicScore :: (Ord a) => [[a]] -> Point -> Int
-getScenicScore list pt =
+getScenicScore :: (Ord a) => [[a]] -> [[a]] -> Point -> Int
+getScenicScore list tlist pt =
     let lvd = getLeftViewDist (list !! (y pt)) (x pt)
         rvd = getRightViewDist (list !! (y pt)) (x pt)
-        tlist = List.transpose list
         tvd = getLeftViewDist (tlist !! (x pt)) (y pt)
         bvd = getRightViewDist (tlist !! (x pt)) (y pt) in
             lvd * rvd * tvd * bvd
 
-findMaxScenicScoreAlongX :: (Ord a) => [[a]] -> Int -> Int -> Int -> Int
-findMaxScenicScoreAlongX list x y maxValue =
+findMaxScenicScoreAlongX :: (Ord a) => [[a]] -> [[a]] -> Int -> Int -> Int -> Int
+findMaxScenicScoreAlongX list tlist x y maxValue =
     if x == (length (list !! y) - 1) then maxValue
-    else findMaxScenicScoreAlongX list (x+1) y (max maxValue (getScenicScore list (Point { x = x, y = y })))
+    else findMaxScenicScoreAlongX list tlist (x+1) y (max maxValue (getScenicScore list tlist (Point { x = x, y = y })))
 
-findMaxScenicScore' :: (Ord a) => [[a]] -> Int -> Int -> Int
-findMaxScenicScore' list y maxValue =
+findMaxScenicScore' :: (Ord a) => [[a]] -> [[a]] -> Int -> Int -> Int
+findMaxScenicScore' list tlist y maxValue =
     if y == (length list - 1) then maxValue
-    else findMaxScenicScore' list (y+1) (max maxValue (findMaxScenicScoreAlongX list 0 y 0))
+    else findMaxScenicScore' list tlist (y+1) (max maxValue (findMaxScenicScoreAlongX list tlist 0 y 0))
 
 findMaxScenicScore :: (Ord a) => [[a]] -> Int
-findMaxScenicScore list = findMaxScenicScore' list 0 0
+findMaxScenicScore list = findMaxScenicScore' list (List.transpose list) 0 0
 
 part2 = do
     lines <- getLines "day8/input.txt"

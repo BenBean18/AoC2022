@@ -12,3 +12,6 @@ To run a program, do `cabal run AoC2022 <day#> <part#>` in the AoC2022 folder.
 For example, `cabal run AoC2022 5 2` runs Day 5 part 2.
 
 I hope this can be used as a resource for other people doing Advent of Code this year! I'll try to comment well :)
+
+## Update! Visualizations!
+I made my first visualization for this year for Day 7. That means there's now another thing to run! To run a visualization, run `cabal run AoC2022 <day#> v`.

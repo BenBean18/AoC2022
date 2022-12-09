@@ -33,5 +33,8 @@ main = do
                 else if part == "v" then
                     if day == 7 then Day7.vis
                     else putStrLn "I haven't visualized that day yet (or it doesn't exist)"
+                else if part == "b" then
+                    if day == 9 then Day9.benchmark
+                    else putStrLn "I haven't benchmarked that day yet (or it doesn't exist)"
                 else putStrLn "Usage: AoC2022 <day> <part || \"v\" for visualization>"
     else putStrLn "Usage: AoC2022 <day> <part || \"v\" for visualization>"

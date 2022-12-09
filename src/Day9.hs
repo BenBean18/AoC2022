@@ -2,6 +2,8 @@ module Day9 where
 
 import Utilities
 import qualified Data.Set as Set
+import Criterion.Main
+import System.Environment
 
 -- I feel like there's a better way to do this than brute force it but I don't know how
 -- I guess using a set instead of storing the entire 2D array helps some?
@@ -40,8 +42,8 @@ parseMove s = let dir = head s
     else if dir == 'U' then Point 0 magnitude
     else Point 0 (-magnitude)
 
-part1 = do
-    lines <- getLines "day9/input.txt"
+part1_ :: [String] -> IO ()
+part1_ lines = do
     let moves = map parseMove lines
     let finalState = foldl doMove BridgeState { h = Point 0 0, t = Point 0 0, tailVisited = Set.empty } moves
     print $ (length . tailVisited $ finalState) + 1 -- +1 to account for start
@@ -109,11 +111,29 @@ doMove2 state (Point x y) = let xMove = (if x == 0 then 0 else if x > 0 then 1 e
                                 movePt = (Point xMove yMove) in
     doMove2 (moveKnot 0 movePt state) (Point (x-xMove) (y-yMove))
 
-part2 = do
-    lines <- getLines "day9/input.txt"
+part2_ :: [String] -> IO ()
+part2_ lines = do
     let moves = map parseMove lines
     let finalState = foldl doMove2 BridgeState2 { knots = [(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0)], tv = Set.empty } moves
     print $ (length . tv $ finalState) + 1
+
+part1 = do
+    lines <- getLines "day9/input.txt"
+    part1_ lines
+
+part2 = do
+    lines <- getLines "day9/input.txt"
+    part2_ lines
+
+time lines =
+    withArgs [""] $ defaultMain [
+        bench "part1" $ nfIO $ part1_ lines
+      , bench "part2" $ nfIO $ part2_ lines
+    ]
+
+benchmark = do
+    lines <- getLines "day9/input.txt"
+    time lines
 
 -- wow that was heckin hard
 -- Z = E+F+G

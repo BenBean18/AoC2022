@@ -126,7 +126,7 @@ part2 = do
     part2_ lines
 
 time lines =
-    withArgs [""] $ defaultMain [
+    withArgs ["--output", "day9.html"] $ defaultMain [
         bench "part1" $ nfIO $ part1_ lines
       , bench "part2" $ nfIO $ part2_ lines
     ]

@@ -4,6 +4,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.List as List
 import Utilities
+import Criterion.Main
+import System.Environment
 
 delFirstLastIndex :: Int -> [Int] -> [Int]
 delFirstLastIndex maxI list =
@@ -54,8 +56,7 @@ findAllColIndices chars index set =
     let newSet = findColIndices (head chars) index in
         findAllColIndices (tail chars) (index+1) (Set.union set newSet)
 
-part1 = do
-    lines <- getLines "day8/input.txt"
+part1_ lines = do
     let rowSet = findAllRowIndices (tail (init lines)) 1 Set.empty
     let colSet = findAllColIndices (tail (init (List.transpose lines))) 1 Set.empty
     print $ (length (Set.union rowSet colSet)) + (length lines) * 2 + (length (lines !! 0)) * 2 - 4 -- -4 to account for corners
@@ -109,6 +110,25 @@ findMaxScenicScore' list tlist y maxValue =
 findMaxScenicScore :: (Ord a) => [[a]] -> Int
 findMaxScenicScore list = findMaxScenicScore' list (List.transpose list) 0 0
 
+part2_ lines = do
+    print $ findMaxScenicScore lines
+
+-- Benchmarking/function definitions
+
+part1 = do
+    lines <- getLines "day8/input.txt"
+    part1_ lines
+
 part2 = do
     lines <- getLines "day8/input.txt"
-    print $ findMaxScenicScore lines
+    part2_ lines
+
+time lines =
+    withArgs ["--output", "day8.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1_ lines
+      , bench "part2" $ nfIO $ part2_ lines
+    ]
+
+benchmark = do
+    lines <- getLines "day8/input.txt"
+    time lines

@@ -8,6 +8,8 @@ import Text.Regex.PCRE
 import Data.Maybe
 import Control.Concurrent
 import System.IO
+import Criterion.Main
+import System.Environment
 
 -- I think creating the whole directory tree would be inefficient
 
@@ -92,8 +94,7 @@ recurseAccumulate fss list =
         threadDelay 500000 -- 0.5 seconds
         (recurseAccumulate (runCmd fss (head list)) (drop 1 list))
 
-part1 = do
-    lines <- getLines "day7/input.txt"
+part1_ lines = do
     -- fold takes a function, list, and initial value. the function takes in
     -- the current value and outputs a new one based on the list item.
     -- fold returns the final value. l means from the left.
@@ -104,8 +105,7 @@ part1 = do
 
 -- 24390891 is wrong
 
-part2 = do
-    lines <- getLines "day7/input.txt"
+part2_ lines = do
     let fss = foldl runCmd FSState { path = "/", sizeMap = Map.empty } lines
     let driveSize = 70000000
     let updateSize = 30000000
@@ -137,3 +137,23 @@ vis = do
     putStrLn ("Used space: " ++ (show ((sizeMap fss) Map.! "/")) ++ "\nNeed to free at least " ++ (show minSpaceToFree) ++ " bytes")
 
     putStrLn $ "Smallest directory size that frees enough space: " ++ (show $ minimum (Map.filter (>= minSpaceToFree) (sizeMap fss)))
+
+-- Benchmarking/function definitions
+
+part1 = do
+    lines <- getLines "day7/input.txt"
+    part1_ lines
+
+part2 = do
+    lines <- getLines "day7/input.txt"
+    part2_ lines
+
+time lines =
+    withArgs ["--output", "day7.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1_ lines
+      , bench "part2" $ nfIO $ part2_ lines
+    ]
+
+benchmark = do
+    lines <- getLines "day7/input.txt"
+    time lines

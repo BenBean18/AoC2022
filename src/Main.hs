@@ -28,6 +28,7 @@ main = do
                     else if day == 6 then Day6.part2
                     else if day == 7 then Day7.part2
                     else if day == 8 then Day8.part2
+                    else if day == 9 then Day9.part2
                     else putStrLn "I haven't solved that yet (or it doesn't exist)"
                 else if part == "v" then
                     if day == 7 then Day7.vis

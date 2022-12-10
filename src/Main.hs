@@ -37,9 +37,13 @@ main = do
                     if day == 7 then Day7.vis
                     else putStrLn "I haven't visualized that day yet (or it doesn't exist)"
                 else if part == "b" then
-                    if day == 7 then Day7.benchmark
+                    if day == 4 then Day4.benchmark
+                    else if day == 5 then Day5.benchmark
+                    else if day == 6 then Day6.benchmark
+                    else if day == 7 then Day7.benchmark
                     else if day == 8 then Day8.benchmark
                     else if day == 9 then Day9.benchmark
+                    else if day == 10 then Day10.benchmark
                     else putStrLn "I haven't benchmarked that day yet (or it doesn't exist)"
                 else putStrLn "Usage: AoC2022 <day> <part || \"v\" for visualization>"
     else putStrLn "Usage: AoC2022 <day> <part || \"v\" for visualization>"

@@ -5,6 +5,8 @@ import Text.Regex.Base
 import Text.Regex.PCRE
 import Data.List
 import Debug.Trace
+import System.Environment
+import Criterion.Main
 
 debug = flip trace
 
@@ -43,8 +45,7 @@ parseInstruction stacks str =
                 in (set1D toIndex newColumnTo (set1D fromIndex newColumnFrom stacks))
 
 -- use folds
-part1 = do
-    lines <- getLines "day5/input.txt"
+part1' lines = do
     let stacks = (foldl parseInstruction (foldl addCrateStack [[],[],[],[],[],[],[],[],[],[]] lines) lines)
     let heads = map head (tail stacks) -- ignore index 0
     print heads
@@ -64,8 +65,26 @@ parseInstruction2 stacks str =
                 newColumnTo = from ++ (stacks !! toIndex)
                 in (set1D toIndex newColumnTo (set1D fromIndex newColumnFrom stacks))
 
-part2 = do
-    lines <- getLines "day5/input.txt"
+part2' lines = do
     let stacks = (foldl parseInstruction2 (foldl addCrateStack [[],[],[],[],[],[],[],[],[],[]] lines) lines)
     let heads = map head (tail stacks) -- ignore index 0
     print heads
+
+-- Benchmarking
+part1 = do
+    lines <- getLines "day5/input.txt"
+    part1' lines
+
+part2 = do
+    lines <- getLines "day5/input.txt"
+    part2' lines
+
+time lines =
+    withArgs ["--output", "day5.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1' lines
+      , bench "part2" $ nfIO $ part2' lines
+    ]
+
+benchmark = do
+    lines <- getLines "day5/input.txt"
+    time lines

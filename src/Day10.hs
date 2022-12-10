@@ -4,6 +4,8 @@ import Utilities
 import qualified Data.Map as Map
 import Text.Regex.Base
 import Text.Regex.PCRE
+import System.Environment
+import Criterion.Main
 
 -- A CPU!
 -- I'm just going to build a map of cycle to register value in case it loops.
@@ -30,8 +32,7 @@ getSignalStrength :: Map.Map Int Int -> Int -> Int
 getSignalStrength m cycle =
     (m Map.! cycle)*cycle
 
-part1 = do
-    lines <- getLines "day10/input.txt"
+part1' lines = do
     let states = parseInput lines
     print $ getSignalStrength states 20 + getSignalStrength states 60 + getSignalStrength states 100 + getSignalStrength states 140 + getSignalStrength states 180 + getSignalStrength states 220
 
@@ -52,7 +53,25 @@ printCRT' m rowNumber currentCRT =
 printCRT :: Map.Map Int Int -> String
 printCRT m = printCRT' m 0 ""
 
-part2 = do
-    lines <- getLines "day10/input.txt"
+part2' lines = do
     let states = parseInput lines
     putStr $ printCRT states
+
+-- Benchmarking
+part1 = do
+    lines <- getLines "day10/input.txt"
+    part1' lines
+
+part2 = do
+    lines <- getLines "day10/input.txt"
+    part2' lines
+
+time lines =
+    withArgs ["--output", "day10.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1' lines
+      , bench "part2" $ nfIO $ part2' lines
+    ]
+
+benchmark = do
+    lines <- getLines "day10/input.txt"
+    time lines

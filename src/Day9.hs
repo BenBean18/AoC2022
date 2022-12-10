@@ -42,8 +42,8 @@ parseMove s = let dir = head s
     else if dir == 'U' then Point 0 magnitude
     else Point 0 (-magnitude)
 
-part1_ :: [String] -> IO ()
-part1_ lines = do
+part1' :: [String] -> IO ()
+part1' lines = do
     let moves = map parseMove lines
     let finalState = foldl doMove BridgeState { h = Point 0 0, t = Point 0 0, tailVisited = Set.empty } moves
     print $ (length . tailVisited $ finalState) + 1 -- +1 to account for start
@@ -111,24 +111,24 @@ doMove2 state (Point x y) = let xMove = (if x == 0 then 0 else if x > 0 then 1 e
                                 movePt = (Point xMove yMove) in
     doMove2 (moveKnot 0 movePt state) (Point (x-xMove) (y-yMove))
 
-part2_ :: [String] -> IO ()
-part2_ lines = do
+part2' :: [String] -> IO ()
+part2' lines = do
     let moves = map parseMove lines
     let finalState = foldl doMove2 BridgeState2 { knots = [(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0),(Point 0 0)], tv = Set.empty } moves
     print $ (length . tv $ finalState) + 1
 
 part1 = do
     lines <- getLines "day9/input.txt"
-    part1_ lines
+    part1' lines
 
 part2 = do
     lines <- getLines "day9/input.txt"
-    part2_ lines
+    part2' lines
 
 time lines =
     withArgs ["--output", "day9.html"] $ defaultMain [
-        bench "part1" $ nfIO $ part1_ lines
-      , bench "part2" $ nfIO $ part2_ lines
+        bench "part1" $ nfIO $ part1' lines
+      , bench "part2" $ nfIO $ part2' lines
     ]
 
 benchmark = do

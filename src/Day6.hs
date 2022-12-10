@@ -1,6 +1,8 @@
 module Day6 where
 
 import Utilities
+import System.Environment
+import Criterion.Main
 
 -- Function to determine whether all elements of a list are unique
 isUnique :: (Eq a) => [a] -> Bool
@@ -67,15 +69,32 @@ findFirstUniqueIndex :: (Eq a) => Int -> [a] -> Int
 findFirstUniqueIndex n list = findFirstUniqueIndex' n list 0
 
 -- Part 1 -- need to find the first chunk of 4 unique characters
-part1 = do
-    lines <- getLines "day6/input.txt" -- read input
+part1' lines =
     if length lines < 1 then putStrLn "Invalid input!" -- if less than 1 line, it's invalid
     else print $ findFirstUniqueIndex 4 (lines !! 0) -- otherwise, print the first unique
     -- chunk of 4 characters long in the first line
 
 -- Part 2 -- need to find the first chunk of 14 unique characters
-part2 = do
-    lines <- getLines "day6/input.txt" -- read input
+part2' lines =
     if length lines < 1 then putStrLn "Invalid input!" -- if less than 1 line, it's invalid
     else print $ findFirstUniqueIndex 14 (lines !! 0) -- otherwise, print the first unique
     -- chunk of 14 characters long in the first line
+
+-- Benchmarking
+part1 = do
+    lines <- getLines "day6/input.txt"
+    part1' lines
+
+part2 = do
+    lines <- getLines "day6/input.txt"
+    part2' lines
+
+time lines =
+    withArgs ["--output", "day6.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1' lines
+      , bench "part2" $ nfIO $ part2' lines
+    ]
+
+benchmark = do
+    lines <- getLines "day6/input.txt"
+    time lines

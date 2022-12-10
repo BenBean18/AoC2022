@@ -94,7 +94,7 @@ recurseAccumulate fss list =
         threadDelay 500000 -- 0.5 seconds
         (recurseAccumulate (runCmd fss (head list)) (drop 1 list))
 
-part1_ lines = do
+part1' lines = do
     -- fold takes a function, list, and initial value. the function takes in
     -- the current value and outputs a new one based on the list item.
     -- fold returns the final value. l means from the left.
@@ -105,7 +105,7 @@ part1_ lines = do
 
 -- 24390891 is wrong
 
-part2_ lines = do
+part2' lines = do
     let fss = foldl runCmd FSState { path = "/", sizeMap = Map.empty } lines
     let driveSize = 70000000
     let updateSize = 30000000
@@ -142,16 +142,16 @@ vis = do
 
 part1 = do
     lines <- getLines "day7/input.txt"
-    part1_ lines
+    part1' lines
 
 part2 = do
     lines <- getLines "day7/input.txt"
-    part2_ lines
+    part2' lines
 
 time lines =
     withArgs ["--output", "day7.html"] $ defaultMain [
-        bench "part1" $ nfIO $ part1_ lines
-      , bench "part2" $ nfIO $ part2_ lines
+        bench "part1" $ nfIO $ part1' lines
+      , bench "part2" $ nfIO $ part2' lines
     ]
 
 benchmark = do

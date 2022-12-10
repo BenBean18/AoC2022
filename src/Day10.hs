@@ -42,7 +42,7 @@ getCRTLine :: Map.Map Int Int -> Int -> Int -> String -> String
 getCRTLine m 40 rowNumber currentLine = currentLine
 getCRTLine m pixel rowNumber currentLine = 
     let currentSpriteMid = (m Map.! ((rowNumber*40)+(pixel+1))) in
-        if (abs $ currentSpriteMid-pixel) <= 1 then getCRTLine m (pixel+1) rowNumber (currentLine ++ "#")
+        if (abs $ currentSpriteMid-pixel) <= 1 then getCRTLine m (pixel+1) rowNumber (currentLine ++ "\x2588")
         else getCRTLine m (pixel+1) rowNumber (currentLine ++ " ")
 
 printCRT' :: Map.Map Int Int -> Int -> String -> String

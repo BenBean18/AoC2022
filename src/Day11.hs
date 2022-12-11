@@ -11,6 +11,8 @@ import Debug.Trace
 import Data.Maybe
 import Text.Read
 import qualified Day11_part2
+import System.Environment
+import Criterion.Main
 
 -- Declare custom datatypes
 data Monkey = Monkey { items :: [Int], fn :: ([Monkey] -> [Monkey]), interactedCount :: Int }
@@ -116,8 +118,7 @@ monkeyRounds monkeys numRounds =
 -- from https://ro-che.info/articles/2016-04-02-descending-sort-haskell
 sortDesc = sortBy (flip compare)
 
-part1 = do
-    lines <- getLines "day11/input.txt"
+part1' lines = do
     let monkeys = parseMonkeys lines
     let monkeysAfter20 = monkeys `monkeyRounds` 20
     let sorted = sortDesc monkeysAfter20
@@ -125,4 +126,23 @@ part1 = do
     putStrLn $ "Amount of monkey business: " ++ (show monkeyBusiness)
 
 -- Part 2
-part2 = Day11_part2.part2
+part2' = Day11_part2.part2'
+
+-- Benchmarking
+part1 = do
+    lines <- getLines "day11/input.txt"
+    part1' lines
+
+part2 = do
+    lines <- getLines "day11/input.txt"
+    part2' lines
+
+time lines =
+    withArgs ["--output", "day11.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1' lines
+      , bench "part2" $ nfIO $ part2' lines
+    ]
+
+benchmark = do
+    lines <- getLines "day11/input.txt"
+    time lines

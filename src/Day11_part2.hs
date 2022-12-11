@@ -56,27 +56,31 @@ Monkey 0:
     If false: throw to monkey 3
 -}
 
+multiplyMods :: [Monkey] -> Int
+multiplyMods monkeys = (foldl (*) 1 $ map divisor monkeys)
+
 -- math
-crtSimplify :: [Monkey] -> Int -> Int
-crtSimplify monkeys worryLevel =
-    worryLevel `mod` (foldl (*) 1 $ map divisor monkeys)
+crtSimplify :: Int -> Int -> Int
+crtSimplify modsMultiplied worryLevel =
+    worryLevel `mod` modsMultiplied
 
 -- Parse operation like "new = old * 19" and simplifies using CRT instead of /3
 -- only uses * and + (won't decrease your worry level...)
 parseOperation :: String -> ([Monkey] -> Int -> Int)
 parseOperation op monkeys a =
-    let matches = op =~ "old ([*+]) (\\d+|(?:old))" in
+    let matches = op =~ "old ([*+]) (\\d+|(?:old))"
+        modsMultiplied = multiplyMods monkeys in
         if length matches < 1 then error "Invalid monkey! Monkey business detected!"
         else
             let operator = head ((head matches) !! 1)
                 operand  = readMaybe ((head matches) !! 2) :: Maybe Int in
                     if isNothing operand then -- it is "old"
-                        if operator == '*' then crtSimplify monkeys (a * a)
-                        else if operator == '+' then crtSimplify monkeys (a + a)
+                        if operator == '*' then crtSimplify modsMultiplied (a * a)
+                        else if operator == '+' then crtSimplify modsMultiplied (a + a)
                         else error "Invalid monkey! Monkey business detected!"
                     else
-                        if operator == '*' then crtSimplify monkeys (a * (fromJust operand))
-                        else if operator == '+' then crtSimplify monkeys (a + (fromJust operand))
+                        if operator == '*' then crtSimplify modsMultiplied (a * (fromJust operand))
+                        else if operator == '+' then crtSimplify modsMultiplied (a + (fromJust operand))
                         else error "Invalid monkey! Monkey business detected!"
 
 getDivisor :: String -> Int
@@ -144,8 +148,7 @@ monkeyRounds monkeys numRounds =
 -- from https://ro-che.info/articles/2016-04-02-descending-sort-haskell
 sortDesc = sortBy (flip compare)
 
-part2 = do
-    lines <- getLines "day11/input.txt"
+part2' lines = do
     let monkeys = parseMonkeys lines
     let monkeysAfter10000 = monkeys `monkeyRounds` 10000
     print monkeysAfter10000

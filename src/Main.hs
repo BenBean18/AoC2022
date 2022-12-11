@@ -34,6 +34,7 @@ main = do
                     else if day == 8 then Day8.part2
                     else if day == 9 then Day9.part2
                     else if day == 10 then Day10.part2
+                    else if day == 11 then Day11.part2
                     else putStrLn "I haven't solved that yet (or it doesn't exist)"
                 else if part == "v" then
                     if day == 7 then Day7.vis

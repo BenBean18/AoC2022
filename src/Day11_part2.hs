@@ -1,4 +1,24 @@
-module Day11 where
+module Day11_part2 where
+
+-- FRICK
+-- AoC2022: osCommitMemory: VirtualAlloc MEM_COMMIT failed to commit 11534336 bytes of memory  (error code: 1455): The paging file is too small for this operation to complete.
+
+-- tried evaluating strictly, here's a new error:
+{-
+Round: 9914
+GNU MP: Cannot allocate memory (size=4230479896)
+-}
+
+-- The only thing about the worry value that matters is if it's divisible by a small integer.
+-- n * n 
+
+-- I remembered talk of the Chinese remainder theorem last year
+-- and thought it had something to do with modulo (remainder) so I checked
+-- Google Trends and sure enough it spiked at midnight.
+
+-- modulos have to be coprime for the theorem (GCD = 1) and that is
+-- obviously true for prime numbers since their only divisors are
+-- themselves and one, and the sample & my input have only prime moduluses
 
 -- symmetrical imports :)
 import Utilities
@@ -10,10 +30,9 @@ import Data.List
 import Debug.Trace
 import Data.Maybe
 import Text.Read
-import qualified Day11_part2
 
 -- Declare custom datatypes
-data Monkey = Monkey { items :: [Int], fn :: ([Monkey] -> [Monkey]), interactedCount :: Int }
+data Monkey = Monkey { items :: [Int], divisor :: Int, fn :: ([Monkey] -> [Monkey]), interactedCount :: Int }
 
 instance Ord Monkey where
     m1 `compare` m2 = (interactedCount m1) `compare` (interactedCount m2)
@@ -37,43 +56,52 @@ Monkey 0:
     If false: throw to monkey 3
 -}
 
--- Parse operation like "new = old * 19" and divides by 3
+-- math
+crtSimplify :: [Monkey] -> Int -> Int
+crtSimplify monkeys worryLevel =
+    worryLevel `mod` (foldl (*) 1 $ map divisor monkeys)
+
+-- Parse operation like "new = old * 19" and simplifies using CRT instead of /3
 -- only uses * and + (won't decrease your worry level...)
-parseOperation :: String -> (Int -> Int)
-parseOperation op a =
+parseOperation :: String -> ([Monkey] -> Int -> Int)
+parseOperation op monkeys a =
     let matches = op =~ "old ([*+]) (\\d+|(?:old))" in
         if length matches < 1 then error "Invalid monkey! Monkey business detected!"
         else
             let operator = head ((head matches) !! 1)
                 operand  = readMaybe ((head matches) !! 2) :: Maybe Int in
                     if isNothing operand then -- it is "old"
-                        if operator == '*' then (a * a) `div` 3
-                        else if operator == '+' then (a + a) `div` 3
+                        if operator == '*' then crtSimplify monkeys (a * a)
+                        else if operator == '+' then crtSimplify monkeys (a + a)
                         else error "Invalid monkey! Monkey business detected!"
                     else
-                        if operator == '*' then (a * (fromJust operand)) `div` 3
-                        else if operator == '+' then (a + (fromJust operand)) `div` 3
+                        if operator == '*' then crtSimplify monkeys (a * (fromJust operand))
+                        else if operator == '+' then crtSimplify monkeys (a + (fromJust operand))
                         else error "Invalid monkey! Monkey business detected!"
+
+getDivisor :: String -> Int
+getDivisor s =
+    read (last (head (s =~ "divisible by (\\d+)" :: [[String]]))) :: Int
 
 parseTest :: String -> (Int -> Bool)
 parseTest s i =
-    let divisor = read (last (head (s =~ "divisible by (\\d+)" :: [[String]]))) :: Int in i `mod` divisor == 0
+    let divisor = getDivisor s in i `mod` divisor == 0
 
 debug = flip trace
 
 -- Arguments: operation, test, monkey if true, monkey if false, monkey id
 -- Returns a function [Monkey] -> [Monkey]
-monkFunc :: (Int -> Int) -> (Int -> Bool) -> Int -> Int -> Int -> ([Monkey] -> [Monkey])
+monkFunc :: ([Monkey] -> Int -> Int) -> (Int -> Bool) -> Int -> Int -> Int -> ([Monkey] -> [Monkey])
 monkFunc operation test true false id monkeys =
     let currentItems = items (monkeys !! id) in
         if length currentItems == 0 then monkeys
         else
-            let thisItem = operation $ head currentItems
+            let thisItem = operation monkeys (head currentItems)
                 monkeyToThrowTo = if test thisItem then true else false
                 destMonkeyItems = items (monkeys !! monkeyToThrowTo)
                 newDestMonkeyItems = insert1D 0 thisItem destMonkeyItems
                 newSelfItems = tail currentItems
-                newMonkeys = (set1D id Monkey { items = newSelfItems, fn = fn (monkeys !! id), interactedCount = interactedCount (monkeys !! id) + 1 } (set1D monkeyToThrowTo Monkey { items = newDestMonkeyItems, fn = fn (monkeys !! monkeyToThrowTo), interactedCount = interactedCount (monkeys !! monkeyToThrowTo) } monkeys)) in
+                newMonkeys = (set1D id Monkey { items = newSelfItems, divisor = divisor (monkeys !! id), fn = fn (monkeys !! id), interactedCount = interactedCount (monkeys !! id) + 1 } (set1D monkeyToThrowTo Monkey { items = newDestMonkeyItems, divisor = divisor (monkeys !! monkeyToThrowTo), fn = fn (monkeys !! monkeyToThrowTo), interactedCount = interactedCount (monkeys !! monkeyToThrowTo) } monkeys)) in
                     monkFunc operation test true false id newMonkeys
 
 -- parseMonkey takes a whole monkey:
@@ -96,7 +124,7 @@ parseMonkey monkey =
         test = parseTest monkey
         true = read (last (head (monkey =~ "If true: throw to monkey (\\d+)" :: [[String]]))) :: Int
         false = read (last (head (monkey =~ "If false: throw to monkey (\\d+)" :: [[String]]))) :: Int in
-            Monkey { items = startingItems, fn = monkFunc operation test true false id, interactedCount = 0 }
+            Monkey { items = startingItems, divisor = getDivisor monkey, fn = monkFunc operation test true false id, interactedCount = 0 }
 
 parseMonkeys :: [String] -> [Monkey]
 parseMonkeys strs = map (parseMonkey . concat . (\y -> map (\x -> x ++ "\n") y)) (divvy 6 7 strs)
@@ -116,13 +144,11 @@ monkeyRounds monkeys numRounds =
 -- from https://ro-che.info/articles/2016-04-02-descending-sort-haskell
 sortDesc = sortBy (flip compare)
 
-part1 = do
+part2 = do
     lines <- getLines "day11/input.txt"
     let monkeys = parseMonkeys lines
-    let monkeysAfter20 = monkeys `monkeyRounds` 20
-    let sorted = sortDesc monkeysAfter20
+    let monkeysAfter10000 = monkeys `monkeyRounds` 10000
+    print monkeysAfter10000
+    let sorted = sortDesc monkeysAfter10000
     let monkeyBusiness = interactedCount (head sorted) * interactedCount (sorted !! 1)
     putStrLn $ "Amount of monkey business: " ++ (show monkeyBusiness)
-
--- Part 2
-part2 = Day11_part2.part2

@@ -13,7 +13,6 @@ cabal-dev/
 *.hi
 *.o
 *.p_hi
-*.prof
 *.tix
 dist
 dist-*

@@ -7,6 +7,8 @@ import Data.Char
 import Data.Maybe
 import Data.PSQueue
 import Debug.Trace
+import System.Environment
+import Criterion.Main
 
 -- I smell Dijkstra's algorithm
 
@@ -100,10 +102,9 @@ handleNeighbors pq cameFrom costMap origNode neighbors =
 -- followBack last cameFrom first l = let newNode = cameFrom Map.! last in
 --     followBack newNode cameFrom first (newNode:l)
 
--- 457 too high
+-- 457 too high (assumed start was always the first node, which wasn't true)
 
-part1 = do
-    lines <- getLines "day12/input.txt"
+part1' lines = do
     let graph = getGraph lines
     let end = getEnd graph
     let (cameFrom, costMap) = dijkstra graph end
@@ -150,8 +151,26 @@ dijkstra2 :: Graph Node -> (Map.Map Node Node, Map.Map Node Int, Node)
 dijkstra2 g = 
     dijkstra2' g (singleton (getEnd g) 0) Map.empty (Map.singleton (getEnd g) 0) (\(Node pos c) -> c == 'a' || c == 'S')
 
-part2 = do
-    lines <- getLines "day12/input.txt"
+part2' lines = do
     let graph = getGraph2 lines
     let (cameFrom, costMap, start) = dijkstra2 graph
     print $ costMap Map.! start
+
+-- Benchmarking
+part1 = do
+    lines <- getLines "day12/input.txt"
+    part1' lines
+
+part2 = do
+    lines <- getLines "day12/input.txt"
+    part2' lines
+
+time lines =
+    withArgs ["--output", "day12.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1' lines
+      , bench "part2" $ nfIO $ part2' lines
+    ]
+
+benchmark = do
+    lines <- getLines "day12/input.txt"
+    time lines

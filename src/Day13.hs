@@ -8,6 +8,8 @@ import Text.Regex.PCRE
 import Data.List.Split
 import Debug.Trace
 import Data.List (sortBy, elemIndex)
+import Criterion.Main
+import System.Environment
 
 -- https://stackoverflow.com/questions/48492142/replace-a-substring-from-a-string-in-haskell
 import Data.Text(pack, unpack, replace)
@@ -105,8 +107,7 @@ parseString s = snd (parseList (split (oneOf "[],") (replaceStr "]" "]]" s)) (Ne
 isCorrectOrder :: [String] -> Bool
 isCorrectOrder [a, b] = (compareList (parseString a) (parseString b)) /= GT
 
-part1 = do
-    lines <- getLines "day13/input.txt"
+part1' lines = do
     let pairs = divvy 2 3 lines
     let pairsCorrect = map isCorrectOrder pairs
     let sumOfIndices = foldl (+) 0 [if (fst t) then (snd t) else 0 | t <- (zip pairsCorrect [1..(length pairsCorrect)])]
@@ -118,8 +119,7 @@ part1 = do
 -- Sort into correct order
 -- div1 = Nested [Nested [Nested [Elem 2]]]
 -- div2 = Nested [Nested [Nested [Elem 6]]]
-part2 = do
-    lines <- getLines "day13/input.txt"
+part2' lines = do
     let nonBlankLines = (filter (/= "") lines)
     let packets_ = map parseString nonBlankLines
     let div1 = (Nested [Nested [Nested [Elem 2]]])
@@ -129,3 +129,22 @@ part2 = do
     let div1Location = (fromMaybe (-1) $ elemIndex div1 sorted) + 1
     let div2Location = (fromMaybe (-1) $ elemIndex div2 sorted) + 1
     print $ div1Location * div2Location
+
+-- Benchmarking
+part1 = do
+    lines <- getLines "day13/input.txt"
+    part1' lines
+
+part2 = do
+    lines <- getLines "day13/input.txt"
+    part2' lines
+
+time lines =
+    withArgs ["--output", "day13.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1' lines
+      , bench "part2" $ nfIO $ part2' lines
+    ]
+
+benchmark = do
+    lines <- getLines "day13/input.txt"
+    time lines

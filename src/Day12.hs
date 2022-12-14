@@ -6,7 +6,6 @@ import qualified Data.Set as Set
 import Data.Char
 import Data.Maybe
 import Data.PSQueue
-import Debug.Trace
 import System.Environment
 import Criterion.Main
 
@@ -62,7 +61,6 @@ dijkstra' Graph { nodes = nodes, neighbors = neighbors } pq cameFrom costMap goa
         else
             let currentNode = key $ fromJust currentNode_ in
                 if currentNode == goal then 
-                    (trace $ show goal)
                     (cameFrom, costMap)
                 else
                     let (newPQ, newCameFrom, newCostMap) = handleNeighbors newPQ_ cameFrom costMap currentNode (neighbors Map.! currentNode) in

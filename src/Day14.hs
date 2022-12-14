@@ -8,6 +8,9 @@ import Text.Regex.PCRE
 import qualified Data.Map as Map
 import Data.Maybe
 import Debug.Trace
+import Criterion.Main
+import System.Environment
+
 -- parse into 2d array
 -- ideally find a way to get final state without running all of the simulation steps
 -- (I assume part 2 will be more compute intensive)
@@ -77,8 +80,7 @@ allSand m p = let !maxY = calcMaxY m
                   (newMap, end) = moveSand m p maxY in
                     if end then newMap else allSand newMap p
 
-part1 = do
-    lines <- getLines "day14/input.txt"
+part1' lines = do
     let sm = foldl addLineToMap Map.empty lines
     let finalMap = allSand sm (Point 500 0)
     print $ countSand finalMap
@@ -111,9 +113,27 @@ allSand2 :: SandMap -> Point -> Int -> SandMap
 allSand2 m p maxY = let (newMap, end) = moveSand2 m p maxY in
                     if end then newMap else allSand2 newMap p maxY
 
-part2 = do
-    lines <- getLines "day14/input.txt"
+part2' lines = do
     let sm = foldl addLineToMap Map.empty lines
     let !maxY = calcMaxY sm
     let finalMap = allSand2 sm (Point 500 0) maxY
     print $ countSand finalMap
+
+-- Benchmarking
+part1 = do
+    lines <- getLines "day14/input.txt"
+    part1' lines
+
+part2 = do
+    lines <- getLines "day14/input.txt"
+    part2' lines
+
+time lines =
+    withArgs ["--output", "day14.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1' lines
+      , bench "part2" $ nfIO $ part2' lines
+    ]
+
+benchmark = do
+    lines <- getLines "day14/input.txt"
+    time lines

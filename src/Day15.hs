@@ -6,6 +6,8 @@ import Text.Regex.PCRE
 import Data.List
 import Data.List.Split
 import Data.Maybe
+import Criterion.Main
+import System.Environment
 
 insert1D :: Int -> a -> [a] -> [a]
 insert1D i v l = let (ys,zs) = splitAt i l in ys ++ [v] ++ zs
@@ -105,8 +107,7 @@ rangeSpan (x1, x2) = abs (x1-x2)
 getRanges :: [Scanner] -> Int -> [(Int, Int)]
 getRanges scanners y = combineListOfRanges (foldl (\current s -> (getRange s y) ++ current) [] scanners)
 
-part1 = do
-    lines <- getLines "day15/input.txt"
+part1' lines = do
     let scanners = map parseScanner lines
     let ranges = getRanges scanners 2000000
     print $ ranges
@@ -116,8 +117,7 @@ part1 = do
 -- Part 2
 
 -- Need to store x and y overlap not just a specific row.
-part2 = do
-    lines <- getLines "day15/input.txt"
+part2' lines = do
     let scanners = map parseScanner lines
     let ranges = filter (\(r, y) -> length r > 1) (zip [getRanges scanners y | y <- [0..4000000]] [0..4000000])
     if length ranges == 1 then
@@ -127,3 +127,22 @@ part2 = do
     else print "No beacon location found"
     --let total = foldl (\current r -> (rangeSpan r) + current) 0 ranges
     --print $ total
+
+-- Benchmarking
+part1 = do
+    lines <- getLines "day15/input.txt"
+    part1' lines
+
+part2 = do
+    lines <- getLines "day15/input.txt"
+    part2' lines
+
+time lines =
+    withArgs ["--output", "day15.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1' lines
+      , bench "part2" $ nfIO $ part2' lines
+    ]
+
+benchmark = do
+    lines <- getLines "day15/input.txt"
+    time lines

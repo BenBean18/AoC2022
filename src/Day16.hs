@@ -4,6 +4,7 @@ import Utilities
 import Text.Regex.Base
 import Text.Regex.PCRE
 import Data.List.Split
+import qualified Data.PSQueue as PSQ
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Debug.Trace
@@ -194,3 +195,16 @@ workingGraph valves = let m = bfs valves in
 -- AA to DD = 1
 -- AA to CC = 2
 -- AA to BB = 1
+
+-- Goal: path with the highest pressure
+
+-- Ok so we have two things, one we want to minimize (minutes), one we want to maximize (pressure)
+-- What if we do
+data Cost = Cost { minutes :: Int, pressure :: Int } deriving (Eq, Show)
+instance Ord Cost where
+    Cost { minutes = m1, pressure = p1 } `compare` Cost { minutes = m2, pressure = p2 } = 
+        let comp = p2 `compare` p1 in
+            if comp == EQ then m1 `compare` m2 {- inverted b/c we want pressure but not minutes -} else comp
+-- optimizing for lowest cost
+-- and run Dijkstra's algorithm with the cost being a Cost.
+-- once all valves opened, then return pressure cost

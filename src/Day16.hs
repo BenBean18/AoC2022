@@ -8,6 +8,7 @@ import qualified Data.PSQueue as PSQ
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Debug.Trace
+import Data.List (maximumBy)
 -- This seems like a special case of pathfinding
 -- Store the current path (all of it)
 -- Valid moves: move to a different valve or open the current one
@@ -21,6 +22,7 @@ data Move = Open Valve | MoveTo Valve deriving (Eq, Show, Ord)
 data Path = Path [Move] [Valve] Int deriving (Eq, Show) -- moves, valves open, total pressure
 instance Ord Path where
     (Path _ _ p1) `compare` (Path _ _ p2) = p1 `compare` p2
+compValve Valve { flowRate = r1 } Valve { flowRate = r2 } = r1 `compare` r2
 
 movesFor :: Valve -> [Valve] -> [Valve] -> [Move]
 movesFor valve allValves openValves = 
@@ -208,3 +210,127 @@ instance Ord Cost where
 -- optimizing for lowest cost
 -- and run Dijkstra's algorithm with the cost being a Cost.
 -- once all valves opened, then return pressure cost
+
+-- bfs2' :: PSQ.PSQ  -> [Valve] -> Map.Map Valve Valve -> Map.Map Valve Valve
+-- bfs2' [] allValves cameFrom = cameFrom
+-- bfs2' frontier_ allValves cameFrom =
+--     let current = last frontier_
+--         frontier = init frontier_
+--         newValves = (filter (\v -> not (v `elem` (Map.keys cameFrom))) (getNeighbors current allValves)) in
+--             bfs2' (newValves ++ frontier) allValves (cameFrom `Map.union` (Map.fromList [(x, current) | x <- newValves]))
+
+-- D, 28 min left
+-- (add one to open)
+-- 3 min to J
+-- 5 min to H
+-- 1 min to E
+-- 0 min to D
+-- 1 min to C
+-- 2 min to B
+
+findPressure :: (Valve, Int) -> Int -> Int
+findPressure (v, minsToGetThere) minsLeft = (flowRate v) * (minsLeft-minsToGetThere-1)
+
+potentialPressure :: Valve -> Map.Map Valve [(Valve, Int)] -> [Valve] -> Int -> Int
+potentialPressure v m opened mins =
+    let neighbors = (filter (\(a, b) -> not (a `elem` opened)) (m Map.! v))
+        pressures = map (\(a,b) -> findPressure (a,b) mins) neighbors in
+            (foldl (+) 0 pressures) + (foldl (+) 0 (map (\v -> (flowRate v) * mins) opened))
+
+valve :: String -> [Valve] -> Valve
+valve s valves = head $ filter (\v -> name v == s) valves
+
+-- this finds the lowest because it values potential (unachievable) pressure over actual pressure gained
+-- so the lowest = highest potential
+
+potentialPressures :: Valve -> Map.Map Valve [(Valve, Int)] -> [Valve] -> Int -> [(Valve, Int, Int)]
+potentialPressures v m opened mins =
+    let neighbors = (filter (\(a, b) -> not (a `elem` opened)) (m Map.! v))
+        states = map (\(a,b) -> (a, mins - b - 1)) neighbors
+        pps = map (\(a, b) -> (a, (potentialPressure a m (a:opened) b) + ((flowRate a) * (mins - b - 1)), b)) states in pps
+
+-- check next level before pruning
+-- 
+
+-- frontier = Queue()
+-- frontier.put(start )
+-- came_from = dict() # path A->B is stored as came_from[B] == A
+-- came_from[start] = None
+
+-- while not frontier.empty():
+--    current = frontier.get()
+--    for next in graph.neighbors(current):
+--       if next not in came_from:
+--          frontier.put(next)
+--          came_from[next] = current
+
+bfsWorking :: [Valve] -> Map.Map Valve Valve -> Map.Map Valve [(Valve, Int)] -> Map.Map Valve Valve
+bfsWorking [] cameFrom graph = cameFrom
+bfsWorking frontier cameFrom graph = (trace $ show frontier) (
+    let current = last frontier
+        neighbors = graph Map.! current
+        newNeighbors = {-filter (\(x, _) -> not (x `elem` (Map.keys cameFrom))) -}neighbors in
+            bfsWorking ((map fst newNeighbors) ++ (init frontier)) (Map.union cameFrom (Map.fromList [((fst v), current) | v <- newNeighbors])) graph)
+
+-- Dijkstra
+-- frontier = PriorityQueue()
+-- frontier.put(start, 0)
+-- came_from = dict()
+-- cost_so_far = dict()
+-- came_from[start] = None
+-- cost_so_far[start] = 0
+
+-- while not frontier.empty():
+--    current = frontier.get()
+
+--    if current == goal:
+--       break
+   
+--    for next in graph.neighbors(current):
+--       new_cost = cost_so_far[current] + graph.cost(current, next)
+--       if next not in cost_so_far or new_cost < cost_so_far[next]:
+--          cost_so_far[next] = new_cost
+--          priority = new_cost
+--          frontier.put(next, priority)
+--          came_from[next] = current
+-- dijkstra :: PSQ.PSQ 
+
+highestUnopened :: Valve -> Map.Map Valve [(Valve, Int)] -> [Valve] -> (Valve, Int)
+highestUnopened v m opened = let neighbors = (filter (\(a, b) -> not (a `elem` opened)) (m Map.! v)) in
+    maximumBy (\x1 x2 -> compValve (fst x1) (fst x2)) neighbors
+
+-- function that returns the pressure going from highest to lowest
+getOrderedPressure :: [Valve] -> Map.Map Valve [(Valve, Int)] -> Int -> Int -> Int
+getOrderedPressure opened m minsLeft pressure =
+    if length opened == length (Map.keys m) then pressure
+    else
+        let (highest,minutes) = highestUnopened (last opened) m opened
+            newMins = minsLeft-minutes-1
+            fr = flowRate highest
+            p = fr * newMins in (trace $ show highest ++ " " ++ show newMins)
+        getOrderedPressure (opened ++ [highest]) m newMins (pressure + p)
+
+addedPossiblePressure :: [Valve] -> Map.Map Valve [(Valve, Int)] -> Int -> Int -> Int
+addedPossiblePressure opened m minsLeft pressure =
+    if length opened == length (Map.keys m) then pressure
+    else
+        let (highest,minutes) = highestUnopened (last opened) m opened
+            newMins = minsLeft-minutes-1
+            fr = flowRate highest
+            p = fr * newMins in (trace $ show highest ++ " " ++ show newMins)
+        addedPossiblePressure (opened ++ [highest]) m minsLeft (pressure + p)
+
+-- BFS
+-- Store current path
+-- If the current pressure + (for all neighbors: (distance from last in current path * flow rate)) > stored maximum for current number of minutes,
+    -- this is `addedPossiblePressure valves graph minutesLeft p`
+-- then add neighbors to frontier. otherwise don't.
+-- this is only on the current graph
+-- it's actually Dijkstra because it's a priority queue<path, pressure>
+-- return once 30 moves or all are open
+
+-- valves are [oldest, older, ..., newer, newest]
+data NewPath = NewPath { valves :: [Valve], minutesLeft :: Int, p :: Int } deriving (Eq, Show)
+
+-- dijkstra :: PSQ.PSQ NewPath Int -> 
+--     -- pop from queue, 

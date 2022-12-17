@@ -4,8 +4,8 @@ import Utilities
 import Text.Regex.Base
 import Text.Regex.PCRE
 import Data.List.Split
-import Data.PSQueue
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Debug.Trace
 -- This seems like a special case of pathfinding
 -- Store the current path (all of it)
@@ -56,11 +56,11 @@ getPressure (Path _ _ p) = p
 
 doStuff' :: [Path] -> Set.Set Path -> [Valve] -> Path
 doStuff' paths alreadyVisited allValves =
-    let p = head paths in
+    let p = maximum paths in (trace $ show $ p) (
         if (length $ getValves p) == length (filter (\v -> flowRate v /= 0) allValves) then p
         else if length (getMoves p) >= 30 then doStuff' (filter (/= p) paths) (Set.insert p alreadyVisited) allValves
         else
-            doStuff' ((filter (/= p) paths) ++ (filter (\x -> not (x `elem` alreadyVisited)) (pathsFor p allValves))) (Set.insert p alreadyVisited) allValves
+            doStuff' ((filter (/= p) paths) ++ (filter (\x -> not (x `elem` alreadyVisited)) (pathsFor p allValves))) (Set.insert p alreadyVisited) allValves)
 
 doStuff :: [Valve] -> Path
 doStuff allValves = doStuff' (initPath (head (filter (\v -> name v == "AA") allValves)) allValves) Set.empty allValves
@@ -143,3 +143,54 @@ CC (2)  - 1 minute
 
 -- It's a tree
 -- Find highest leaf
+
+-- but.. there are ~1.3 terapaths for my input
+-- maybe do BFS where the nodes are just the nonzero ones
+-- cost = how many minutes used to move there & open
+-- or cost = added pressure when going to that node, when reached end then yay, store how many minutes already used
+-- A*? heuristic (to maximize) = current pressure?
+
+-- Store movement cost to each one
+
+bfs' :: [Valve] -> [Valve] -> Map.Map Valve Valve -> Map.Map Valve Valve
+bfs' [] allValves cameFrom = cameFrom
+bfs' frontier_ allValves cameFrom =
+    let current = last frontier_
+        frontier = init frontier_
+        newValves = (filter (\v -> not (v `elem` (Map.keys cameFrom))) (getNeighbors current allValves)) in
+            bfs' (newValves ++ frontier) allValves (cameFrom `Map.union` (Map.fromList [(x, current) | x <- newValves]))
+
+bfs :: [Valve] -> Map.Map Valve Valve
+bfs (v:vs) = bfs' [v] (v:vs) (Map.singleton v v)
+
+path :: Valve -> Valve -> [Valve] -> [Valve] -> [Valve]
+path end start current valves = let m = bfs' [start] valves (Map.singleton start start) in
+    if end == start then current else
+        let next = m Map.! end in
+            if next == start then current ++ [next]
+            else path next start (current ++ [next]) valves
+
+allWorking :: [Valve] -> [Valve]
+allWorking valves = filter (\valve -> flowRate valve /= 0) valves
+
+cost :: Valve -> Valve -> [Valve] -> Int
+cost from to m = length $ path from to [] m
+
+foldingThingy :: Map.Map Valve [(Valve, Int)] -> (Valve, (Valve, Int)) -> Map.Map Valve [(Valve, Int)]
+foldingThingy m (k, v) = Map.insertWith (++) k [v] m
+
+findAA :: [Valve] -> Valve
+findAA allValves = (head (filter (\v -> name v == "AA") allValves))
+
+workingGraph :: [Valve] -> Map.Map Valve [(Valve, Int)]
+workingGraph valves = let m = bfs valves in
+    foldl foldingThingy Map.empty [(a, (b, cost a b valves)) | a <- findAA valves : allWorking valves, b <- allWorking valves]
+
+-- Is this a DFS?
+
+-- AA to JJ = 2
+-- AA to HH = 5
+-- AA to EE = 2
+-- AA to DD = 1
+-- AA to CC = 2
+-- AA to BB = 1

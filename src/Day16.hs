@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Debug.Trace
 import Data.List (maximumBy)
+import Data.Maybe
 -- This seems like a special case of pathfinding
 -- Store the current path (all of it)
 -- Valid moves: move to a different valve or open the current one
@@ -307,7 +308,7 @@ getOrderedPressure opened m minsLeft pressure =
         let (highest,minutes) = highestUnopened (last opened) m opened
             newMins = minsLeft-minutes-1
             fr = flowRate highest
-            p = fr * newMins in (trace $ show highest ++ " " ++ show newMins)
+            p = fr * newMins in{- (trace $ show highest ++ " " ++ show newMins) -}
         getOrderedPressure (opened ++ [highest]) m newMins (pressure + p)
 
 addedPossiblePressure :: [Valve] -> Map.Map Valve [(Valve, Int)] -> Int -> Int -> Int
@@ -317,7 +318,7 @@ addedPossiblePressure opened m minsLeft pressure =
         let (highest,minutes) = highestUnopened (last opened) m opened
             newMins = minsLeft-minutes-1
             fr = flowRate highest
-            p = fr * newMins in (trace $ show highest ++ " " ++ show newMins)
+            p = fr * newMins in{- (trace $ show highest ++ " " ++ show newMins) -}
         addedPossiblePressure (opened ++ [highest]) m minsLeft (pressure + p)
 
 -- BFS
@@ -326,11 +327,43 @@ addedPossiblePressure opened m minsLeft pressure =
     -- this is `addedPossiblePressure valves graph minutesLeft p`
 -- then add neighbors to frontier. otherwise don't.
 -- this is only on the current graph
--- it's actually Dijkstra because it's a priority queue<path, pressure>
+-- it's actually Dijkstra because it's a priority queue<path, 100000000 - pressure> (big number minus because we have to find the minimum)
 -- return once 30 moves or all are open
 
 -- valves are [oldest, older, ..., newer, newest]
-data NewPath = NewPath { valves :: [Valve], minutesLeft :: Int, p :: Int } deriving (Eq, Show)
+data NewPath = NewPath { valves :: [Valve], minutesLeft :: Int, p :: Int } deriving (Show, Ord)
+instance Eq NewPath where
+    NewPath { valves = v1, minutesLeft = m1, p = p1 } == NewPath { valves = v2, minutesLeft = m2, p = p2 } = v1 == v2 && m1 == m2 && p1 == p2
+-- or do we need a custom instance to sort by priority?
 
--- dijkstra :: PSQ.PSQ NewPath Int -> 
---     -- pop from queue, 
+neighborPaths :: NewPath -> Map.Map Valve [(Valve, Int)] -> Set.Set NewPath -> [NewPath]
+neighborPaths path m set =
+    let lastValve = last $ valves path
+        neighbors = m Map.! lastValve                                      -- HOW DID I FORGET TO ADD THE CURRENT PRESSURE          vvvvvvv
+        paths = map (\(valve, cost) -> NewPath { valves = (valves path) ++ [valve], minutesLeft = (minutesLeft path) - cost - 1, p = p path + (flowRate valve) * ((minutesLeft path) - cost - 1) }) (filter (\(valve, _) -> not (valve `elem` (valves path))) neighbors)
+            in filter (\x -> not (x `elem` set)) paths
+-- TODO need to return visited with the new paths added
+-- edit: no. please don't do that. it means they can't be visited
+
+--                 path   pressure maxP atMins
+bfsGood :: PSQ.PSQ NewPath Int -> (Int, Int) -> Set.Set NewPath -> Map.Map Valve [(Valve, Int)] -> NewPath
+bfsGood frontier_ (maxPressure, minutesLeftAtMax) visited graph =
+    let Just (currentBinding, frontier) = PSQ.minView frontier_
+        currentPath = PSQ.key currentBinding
+        currentPressure = PSQ.prio currentBinding
+        nextPressure = (p currentPath) + (addedPossiblePressure (valves currentPath) graph (minutesLeft currentPath) (p currentPath))
+        lastValve = last $ valves currentPath in
+            if (length $ valves currentPath) == (length $ Map.keys graph) then currentPath -- all open
+            else
+                if currentPath `elem` visited then bfsGood frontier (maxPressure, minutesLeftAtMax) visited graph
+                else if (minutesLeft currentPath) > minutesLeftAtMax || nextPressure > maxPressure || (p currentPath) > maxPressure then
+                    let nps = (neighborPaths currentPath graph visited) in (trace $ show $ maximum $ map p nps) (
+                        if (p currentPath) > maxPressure then
+                            bfsGood (foldl (\q path -> PSQ.insert path (100000000-(addedPossiblePressure (valves path) graph (minutesLeft path) (p path))) q) frontier nps) ((p currentPath), (minutesLeft currentPath)) (Set.insert currentPath visited) graph
+                        else bfsGood (foldl (\q path -> PSQ.insert path (100000000-(addedPossiblePressure (valves path) graph (minutesLeft path) (p path))) q) frontier nps) (maxPressure, minutesLeftAtMax) {-(foldl (\s path -> Set.insert path s) visited nps)-}(Set.insert currentPath visited) graph -- the old way marked all next paths as visited so we wouldn't explore them
+                    )
+                else bfsGood frontier (maxPressure, minutesLeftAtMax) visited graph
+            
+                -- set max pressure
+                -- do the thing on 353
+    -- pop from queue, 

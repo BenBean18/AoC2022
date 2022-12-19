@@ -10,6 +10,8 @@ import qualified Data.Map as Map
 import Debug.Trace
 import Data.List (maximumBy)
 import Data.Maybe
+import Criterion.Main
+import System.Environment
 -- This seems like a special case of pathfinding
 -- Store the current path (all of it)
 -- Valid moves: move to a different valve or open the current one
@@ -347,7 +349,7 @@ neighborPaths :: NewPath -> Map.Map Valve [(Valve, Int)] -> [NewPath]
 neighborPaths path m =
     let lastValve = last $ valves path
         neighbors = m Map.! lastValve                                      -- HOW DID I FORGET TO ADD THE CURRENT PRESSURE          vvvvvvv
-        paths = map (\(valve, cost) -> NewPath { valves = (valves path) ++ [valve], minutesLeft = (minutesLeft path) - cost - 1, p = p path + (flowRate valve) * ((minutesLeft path) - cost - 1) }) (filter (\(valve, _) -> not (valve `elem` (valves path))) neighbors)
+        paths = filter (\p -> minutesLeft p >= 0) $ map (\(valve, cost) -> NewPath { valves = (valves path) ++ [valve], minutesLeft = (minutesLeft path) - cost - 1, p = p path + (flowRate valve) * ((minutesLeft path) - cost - 1) }) (filter (\(valve, _) -> not (valve `elem` (valves path))) neighbors)
             in paths
 -- TODO need to return visited with the new paths added
 -- edit: no. please don't do that. it means they can't be visited
@@ -357,6 +359,7 @@ bfsGood :: PSQ.PSQ NewPath Int -> (Int, Int) -> Map.Map Valve [(Valve, Int)] -> 
 bfsGood frontier_ (maxPressure, minutesLeftAtMax) graph =
     let mv = PSQ.minView frontier_ in
         if isNothing mv then NewPath { valves = [], minutesLeft = 0, p = maxPressure }
+        -- What other exit conditions are there?
         else
             let Just (currentBinding, frontier) = mv
                 currentPath = PSQ.key currentBinding
@@ -376,9 +379,28 @@ bfsGood frontier_ (maxPressure, minutesLeftAtMax) graph =
                 -- do the thing on 353
     -- pop from queue, 
 
-part1 = do
-    lines <- getLines "day16/input.txt"
+part1' lines = do
     let valves = ($!) parseValves lines
     let g = ($!) workingGraph valves
     let aa = valve "AA" valves
     print $ bfsGood (PSQ.singleton (NewPath { Day16.valves = [aa], minutesLeft = 30, p = 0 }) 0) (0, 30) g
+
+-- Benchmarking
+
+part1 = do
+    lines <- getLines "day16/input.txt"
+    part1' lines
+
+-- part2 = do
+--     lines <- getLines "day16/input.txt"
+--     part2' lines
+
+time lines =
+    withArgs ["--output", "day16.html"] $ defaultMain [
+        bench "part1" $ nfIO $ part1' lines
+    --   , bench "part2" $ nfIO $ part2' lines
+    ]
+
+benchmark = do
+    lines <- getLines "day16/input.txt"
+    time lines

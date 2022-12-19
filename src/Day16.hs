@@ -18,7 +18,9 @@ import Data.Maybe
 -- Once all are open in a path, that's the winner
 -- When you open a valve, add (30 - # moves) * pressure to the current path
 
-data Valve = Valve { name :: String, neighbors :: [String], flowRate :: Int } deriving (Eq, Show, Ord)
+data Valve = Valve { name :: String, neighbors :: [String], flowRate :: Int } deriving (Show, Ord)
+instance Eq Valve where
+    Valve { name = n1 } == Valve { name = n2 } = n1 == n2
 data Move = Open Valve | MoveTo Valve deriving (Eq, Show, Ord)
 data Path = Path [Move] [Valve] Int deriving (Eq, Show) -- moves, valves open, total pressure
 instance Ord Path where
@@ -82,11 +84,11 @@ getNeighbors valve allValves = filter (\Valve { name = n } -> n `elem` (neighbor
 parseValves :: [String] -> [Valve]
 parseValves lines = map parseValve lines
 
-part1 = do
-    lines <- getLines "day16/input.txt"
-    let valves = parseValves lines
-    let bestPath = doStuff valves
-    print $ bestPath
+-- part1 = do
+--     lines <- getLines "day16/input.txt"
+--     let valves = parseValves lines
+--     let bestPath = doStuff valves
+--     print $ bestPath
 
 -- Alternate strategy:
 -- Pathfind back from highest to current
@@ -321,6 +323,11 @@ addedPossiblePressure opened m minsLeft pressure =
             p = fr * newMins in{- (trace $ show highest ++ " " ++ show newMins) -}
         addedPossiblePressure (opened ++ [highest]) m minsLeft (pressure + p)
 
+addedPossiblePressure' :: [Valve] -> Map.Map Valve [(Valve, Int)] -> Int -> Int -> Int
+addedPossiblePressure' opened m minsLeft pressure =
+    let allValves = m Map.! (last opened) in
+        foldl (+) pressure (map (\(valve, cost) -> (flowRate valve) * (minsLeft - cost - 1)) (filter (\(v,_) -> not (v `elem` opened)) allValves))
+
 -- BFS
 -- Store current path
 -- If the current pressure + (for all neighbors: (distance from last in current path * flow rate)) > stored maximum for current number of minutes,
@@ -336,34 +343,42 @@ instance Eq NewPath where
     NewPath { valves = v1, minutesLeft = m1, p = p1 } == NewPath { valves = v2, minutesLeft = m2, p = p2 } = v1 == v2 && m1 == m2 && p1 == p2
 -- or do we need a custom instance to sort by priority?
 
-neighborPaths :: NewPath -> Map.Map Valve [(Valve, Int)] -> Set.Set NewPath -> [NewPath]
-neighborPaths path m set =
+neighborPaths :: NewPath -> Map.Map Valve [(Valve, Int)] -> [NewPath]
+neighborPaths path m =
     let lastValve = last $ valves path
         neighbors = m Map.! lastValve                                      -- HOW DID I FORGET TO ADD THE CURRENT PRESSURE          vvvvvvv
         paths = map (\(valve, cost) -> NewPath { valves = (valves path) ++ [valve], minutesLeft = (minutesLeft path) - cost - 1, p = p path + (flowRate valve) * ((minutesLeft path) - cost - 1) }) (filter (\(valve, _) -> not (valve `elem` (valves path))) neighbors)
-            in filter (\x -> not (x `elem` set)) paths
+            in paths
 -- TODO need to return visited with the new paths added
 -- edit: no. please don't do that. it means they can't be visited
 
 --                 path   pressure maxP atMins
-bfsGood :: PSQ.PSQ NewPath Int -> (Int, Int) -> Set.Set NewPath -> Map.Map Valve [(Valve, Int)] -> NewPath
-bfsGood frontier_ (maxPressure, minutesLeftAtMax) visited graph =
-    let Just (currentBinding, frontier) = PSQ.minView frontier_
-        currentPath = PSQ.key currentBinding
-        currentPressure = PSQ.prio currentBinding
-        nextPressure = (p currentPath) + (addedPossiblePressure (valves currentPath) graph (minutesLeft currentPath) (p currentPath))
-        lastValve = last $ valves currentPath in
-            if (length $ valves currentPath) == (length $ Map.keys graph) then currentPath -- all open
-            else
-                if currentPath `elem` visited then bfsGood frontier (maxPressure, minutesLeftAtMax) visited graph
-                else if (minutesLeft currentPath) > minutesLeftAtMax || nextPressure > maxPressure || (p currentPath) > maxPressure then
-                    let nps = (neighborPaths currentPath graph visited) in (trace $ show $ maximum $ map p nps) (
-                        if (p currentPath) > maxPressure then
-                            bfsGood (foldl (\q path -> PSQ.insert path (100000000-(addedPossiblePressure (valves path) graph (minutesLeft path) (p path))) q) frontier nps) ((p currentPath), (minutesLeft currentPath)) (Set.insert currentPath visited) graph
-                        else bfsGood (foldl (\q path -> PSQ.insert path (100000000-(addedPossiblePressure (valves path) graph (minutesLeft path) (p path))) q) frontier nps) (maxPressure, minutesLeftAtMax) {-(foldl (\s path -> Set.insert path s) visited nps)-}(Set.insert currentPath visited) graph -- the old way marked all next paths as visited so we wouldn't explore them
-                    )
-                else bfsGood frontier (maxPressure, minutesLeftAtMax) visited graph
+bfsGood :: PSQ.PSQ NewPath Int -> (Int, Int) -> Map.Map Valve [(Valve, Int)] -> NewPath
+bfsGood frontier_ (maxPressure, minutesLeftAtMax) graph =
+    let mv = PSQ.minView frontier_ in
+        if isNothing mv then NewPath { valves = [], minutesLeft = 0, p = maxPressure }
+        else
+            let Just (currentBinding, frontier) = mv
+                currentPath = PSQ.key currentBinding
+                currentPressure = PSQ.prio currentBinding
+                nextPressure = (p currentPath) + (addedPossiblePressure' (valves currentPath) graph (minutesLeft currentPath) (p currentPath))
+                lastValve = last $ valves currentPath in
+                    if (length $ valves currentPath) == (length $ Map.keys graph) then currentPath -- all open
+                    else
+                        if (minutesLeft currentPath) > minutesLeftAtMax || nextPressure > maxPressure || (p currentPath) > maxPressure then
+                            let nps = (neighborPaths currentPath graph) in
+                                if (p currentPath) > maxPressure then
+                                    bfsGood (foldl (\q path -> PSQ.insert path (100000000-(addedPossiblePressure' (valves path) graph (minutesLeft path) (p path))) q) frontier nps) ((p currentPath), (minutesLeft currentPath)) graph
+                                else bfsGood (foldl (\q path -> PSQ.insert path (100000000-(addedPossiblePressure' (valves path) graph (minutesLeft path) (p path))) q) frontier nps) (maxPressure, minutesLeftAtMax) graph -- the old way marked all next paths as visited so we wouldn't explore them
+                        else bfsGood frontier (maxPressure, minutesLeftAtMax) graph
             
                 -- set max pressure
                 -- do the thing on 353
     -- pop from queue, 
+
+part1 = do
+    lines <- getLines "day16/input.txt"
+    let valves = ($!) parseValves lines
+    let g = ($!) workingGraph valves
+    let aa = valve "AA" valves
+    print $ bfsGood (PSQ.singleton (NewPath { Day16.valves = [aa], minutesLeft = 30, p = 0 }) 0) (0, 30) g

@@ -347,13 +347,13 @@ addedPossiblePressure' path m =
 -- return once 30 moves or all are open
 
 -- valves are [oldest, older, ..., newer, newest]
-data NewPath = NewPath { valves :: [Valve], posA :: Valve, posB :: Valve, minutesLeftA :: Int, minutesLeftB :: Int, p :: Int } deriving (Show, Ord)
+data NewPath = NewPath { valves :: [Valve], posA :: Valve, posB :: Valve, minutesLeftA :: Int, minutesLeftB :: Int, p :: Int, maxP :: Int } deriving (Show, Ord)
 instance Eq NewPath where
     NewPath { valves = v1, posA = p1a, posB = p1b, minutesLeftA = m1a, minutesLeftB = m1b, p = p1 } == NewPath { valves = v2, posA = p2a, posB = p2b, minutesLeftA = m2a, minutesLeftB = m2b, p = p2 } = v1 == v2 && m1a == m2a && m1b == m2b && p1 == p2 && p1a == p2a && p1b == p2b
 -- or do we need a custom instance to sort by priority?
 
-genPath :: NewPath -> Valve -> Int -> Valve -> Int -> NewPath
-genPath path a cA b cB =
+genPath :: NewPath -> Valve -> Int -> Valve -> Int -> Int -> NewPath
+genPath path a cA b cB mp =
     NewPath { valves = (valves path) ++ (if name a /= "" then [a] else []) ++ (if name b /= "" then [b] else []),
               posA = if name a /= "" then a else posA path,
               posB = if name b /= "" then b else posB path,
@@ -361,18 +361,19 @@ genPath path a cA b cB =
               minutesLeftB = (minutesLeftB path) - cB - (if name b /= "" then 1 else 0),
               p = (p path) + 
                   ((flowRate a) * ((minutesLeftA path) - cA - (if name a /= "" then 1 else 0))) + 
-                  ((flowRate b) * ((minutesLeftB path) - cB - (if name b /= "" then 1 else 0)))
+                  ((flowRate b) * ((minutesLeftB path) - cB - (if name b /= "" then 1 else 0))),
+              maxP = mp
             }
 
-neighborPaths :: NewPath -> Map.Map Valve [(Valve, Int)] -> [NewPath]
-neighborPaths path m =
+neighborPaths :: NewPath -> Map.Map Valve [(Valve, Int)] -> Int -> [NewPath]
+neighborPaths path m mp =
     let aPos = posA path
         bPos = posB path
         aNeighbors = m Map.! aPos
         bNeighbors = m Map.! bPos
         --paths = filter (\p -> minutesLeft p >= 0) $ map (\(valve, cost) -> NewPath { valves = (valves path) ++ [valve], minutesLeft = (minutesLeft path) - cost - 1, p = p path + (flowRate valve) * ((minutesLeft path) - cost - 1) }) (filter (\(valve, _) -> not (valve `elem` (valves path))) neighbors)
         -- need to account for when A doesn't move or B doesn't move
-        paths = filter (\p -> minutesLeftA p >= 0 && minutesLeftB p >= 0) $ [genPath path a cA b cB | (a, cA) <- (Valve { name = "", flowRate = 0 }, 0):aNeighbors, (b, cB) <- (Valve { name = "", flowRate = 0 }, 0):bNeighbors, a /= b, not $ a `elem` (valves path), not $ b `elem` (valves path)]
+        paths = filter (\p -> minutesLeftA p >= 0 && minutesLeftB p >= 0) $ [genPath path a cA b cB mp | (a, cA) <- (Valve { name = "", flowRate = 0 }, 0):aNeighbors, (b, cB) <- (Valve { name = "", flowRate = 0 }, 0):bNeighbors, a /= b, not $ a `elem` (valves path), not $ b `elem` (valves path)]
             in paths
 -- TODO need to return visited with the new paths added
 -- edit: no. please don't do that. it means they can't be visited
@@ -380,10 +381,10 @@ neighborPaths path m =
 -- 2141 is too low
 
 --                 path   pressure maxP atMins
-bfsGood :: PSQ.PSQ NewPath Int -> (Int, Int, Int) -> Map.Map Valve [(Valve, Int)] -> NewPath
-bfsGood frontier_ (maxPressure, aMaxMins, bMaxMins) graph =
+bfsGood :: PSQ.PSQ NewPath Int -> (Int, Int, Int) -> Map.Map Valve [(Valve, Int)] -> Int -> NewPath
+bfsGood frontier_ (maxPressure, aMaxMins, bMaxMins) graph iters =
     let mv = PSQ.minView frontier_ in
-        if isNothing mv then NewPath { valves = [], posA = Valve {name="",flowRate=0,neighbors=[]}, posB = Valve {name="",flowRate=0,neighbors=[]}, minutesLeftA = 0, minutesLeftB = 0, p = maxPressure }
+        if isNothing mv then NewPath { valves = [], posA = Valve {name="",flowRate=0,neighbors=[]}, posB = Valve {name="",flowRate=0,neighbors=[]}, minutesLeftA = 0, minutesLeftB = 0, p = maxPressure, maxP = maxPressure }
         -- What other exit conditions are there?
         else
             let Just (currentBinding, frontier) = mv
@@ -392,18 +393,21 @@ bfsGood frontier_ (maxPressure, aMaxMins, bMaxMins) graph =
                 nextPressure = (addedPossiblePressure' currentPath graph)
                 lastValve = last $ valves currentPath in
                     if (length $ valves currentPath) >= (length $ Map.keys graph) then currentPath -- all open
+                    -- if we've exhausted the frontier of older paths
+                    else if iters == 0 && maxPressure /= 0 && (length $ (filter (\path -> maxP (PSQ.key path) < maxPressure) $ PSQ.toList frontier)) < (length $ (filter (\path -> maxP (PSQ.key path) == maxPressure) $ PSQ.toList frontier)) then 
+                        NewPath { valves = [], posA = Valve {name="",flowRate=0,neighbors=[]}, posB = Valve {name="",flowRate=0,neighbors=[]}, minutesLeftA = 0, minutesLeftB = 0, p = maxPressure, maxP = maxPressure }
                     else
                         if {-((minutesLeftA currentPath) > aMaxMins && (minutesLeftB currentPath) > bMaxMins) || -}nextPressure > maxPressure || (p currentPath) > maxPressure then
-                            let nps = (neighborPaths currentPath graph) in
+                            let nps = (neighborPaths currentPath graph maxPressure) in
                                 if (p currentPath) > maxPressure then (trace $ show (p currentPath))
                                     -- so oddly, it only returns the correct solution if the priority is 100000000 - the pressure of the *current path*, not the one being examined/neighbor.
                                     -- I actually didn't mean to do that but for some reason it worked.
                                     -- So, is there a way to optimize based on that?
                                     -- i guess this optimizes based on largest pressure *difference*
                                     -- or it prioritizes old paths (lower maximum) so we don't stay at the end of unproductive trees?
-                                    bfsGood (foldl (\q path -> PSQ.insert path (100000000-(p path)+maxPressure) q) frontier nps) (p currentPath, (minutesLeftA currentPath), (minutesLeftB currentPath)) graph
-                                else bfsGood (foldl (\q path -> PSQ.insert path (100000000-(p path)+maxPressure) q) frontier nps) (maxPressure, aMaxMins, bMaxMins) graph -- the old way marked all next paths as visited so we wouldn't explore them
-                        else bfsGood frontier (maxPressure, aMaxMins, bMaxMins) graph
+                                    bfsGood (foldl (\q path -> PSQ.insert path (100000000-(p path)+maxPressure) q) frontier nps) (p currentPath, (minutesLeftA currentPath), (minutesLeftB currentPath)) graph ((iters + 1) `mod` 100000)
+                                else bfsGood (foldl (\q path -> PSQ.insert path (100000000-(p path)+maxPressure) q) frontier nps) (maxPressure, aMaxMins, bMaxMins) graph ((iters + 1) `mod` 100000) -- the old way marked all next paths as visited so we wouldn't explore them
+                        else bfsGood frontier (maxPressure, aMaxMins, bMaxMins) graph ((iters + 1) `mod` 100000)
             
                 -- set max pressure
                 -- do the thing on 353
@@ -413,7 +417,7 @@ part2' lines = do
     let valves = ($!) parseValves lines
     let g = ($!) workingGraph valves
     let aa = valve "AA" valves
-    print $ bfsGood (PSQ.singleton (NewPath { valves = [aa], posA = aa, posB = aa, minutesLeftA = 26, minutesLeftB = 26, p = 0 }) 0) (0, 26, 26) g
+    print $ bfsGood (PSQ.singleton (NewPath { valves = [aa], posA = aa, posB = aa, minutesLeftA = 26, minutesLeftB = 26, p = 0, maxP = 0 }) 0) (0, 26, 26) g 0
 
 -- Benchmarking
 

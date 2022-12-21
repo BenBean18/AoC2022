@@ -335,7 +335,7 @@ addedPossiblePressure' path m =
         pressure = (p path) in
         foldl (+) pressure (map (\(valve, cost) -> (flowRate valve) * (aMinsLeft - cost - 1)) (filter (\(v,_) -> not (v `elem` opened)) aNeigh))
         +
-        foldl (+) pressure (map (\(valve, cost) -> (flowRate valve) * (bMinsLeft - cost - 1)) (filter (\(v,_) -> not (v `elem` opened)) bNeigh))
+        foldl (+) 0 (map (\(valve, cost) -> (flowRate valve) * (bMinsLeft - cost - 1)) (filter (\(v,_) -> not (v `elem` opened)) bNeigh))
 
 -- BFS
 -- Store current path
@@ -377,6 +377,8 @@ neighborPaths path m =
 -- TODO need to return visited with the new paths added
 -- edit: no. please don't do that. it means they can't be visited
 
+-- 2141 is too low
+
 --                 path   pressure maxP atMins
 bfsGood :: PSQ.PSQ NewPath Int -> (Int, Int, Int) -> Map.Map Valve [(Valve, Int)] -> NewPath
 bfsGood frontier_ (maxPressure, aMaxMins, bMaxMins) graph =
@@ -389,16 +391,18 @@ bfsGood frontier_ (maxPressure, aMaxMins, bMaxMins) graph =
                 currentPressure = PSQ.prio currentBinding
                 nextPressure = (addedPossiblePressure' currentPath graph)
                 lastValve = last $ valves currentPath in
-                    if (length $ valves currentPath) == (length $ Map.keys graph) then currentPath -- all open
+                    if (length $ valves currentPath) >= (length $ Map.keys graph) then currentPath -- all open
                     else
                         if {-((minutesLeftA currentPath) > aMaxMins && (minutesLeftB currentPath) > bMaxMins) || -}nextPressure > maxPressure || (p currentPath) > maxPressure then
                             let nps = (neighborPaths currentPath graph) in
-                                if (p currentPath) > maxPressure then
+                                if (p currentPath) > maxPressure then (trace $ show (p currentPath))
                                     -- so oddly, it only returns the correct solution if the priority is 100000000 - the pressure of the *current path*, not the one being examined/neighbor.
                                     -- I actually didn't mean to do that but for some reason it worked.
                                     -- So, is there a way to optimize based on that?
-                                    bfsGood (foldl (\q path -> PSQ.insert path (100000000-(addedPossiblePressure' currentPath graph)) q) frontier nps) (p currentPath, (minutesLeftA currentPath), (minutesLeftB currentPath)) graph
-                                else bfsGood (foldl (\q path -> PSQ.insert path (100000000-(addedPossiblePressure' currentPath graph)) q) frontier nps) (maxPressure, aMaxMins, bMaxMins) graph -- the old way marked all next paths as visited so we wouldn't explore them
+                                    -- i guess this optimizes based on largest pressure *difference*
+                                    -- or it prioritizes old paths (lower maximum) so we don't stay at the end of unproductive trees?
+                                    bfsGood (foldl (\q path -> PSQ.insert path (100000000-(p path)+maxPressure) q) frontier nps) (p currentPath, (minutesLeftA currentPath), (minutesLeftB currentPath)) graph
+                                else bfsGood (foldl (\q path -> PSQ.insert path (100000000-(p path)+maxPressure) q) frontier nps) (maxPressure, aMaxMins, bMaxMins) graph -- the old way marked all next paths as visited so we wouldn't explore them
                         else bfsGood frontier (maxPressure, aMaxMins, bMaxMins) graph
             
                 -- set max pressure

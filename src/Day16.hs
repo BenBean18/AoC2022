@@ -372,8 +372,8 @@ bfsGood frontier_ (maxPressure, minutesLeftAtMax) graph =
                         if (minutesLeft currentPath) > minutesLeftAtMax || nextPressure > maxPressure || (p currentPath) > maxPressure then
                             let nps = (neighborPaths currentPath graph) in
                                 if (p currentPath) > maxPressure then
-                                    bfsGood (foldl (\q path -> PSQ.insert path (100000000-(addedPossiblePressure' (valves path) graph (minutesLeft path) (p path))) q) frontier nps) ((p currentPath), (minutesLeft currentPath)) graph
-                                else bfsGood (foldl (\q path -> PSQ.insert path (100000000-(addedPossiblePressure' (valves path) graph (minutesLeft path) (p path))) q) frontier nps) (maxPressure, minutesLeftAtMax) graph -- the old way marked all next paths as visited so we wouldn't explore them
+                                    bfsGood (foldl (\q path -> PSQ.insert path (100000000-(p path)) q) frontier nps) ((p currentPath), (minutesLeft currentPath)) graph
+                                else bfsGood (foldl (\q path -> PSQ.insert path (100000000-(p path)) q) frontier nps) (maxPressure, minutesLeftAtMax) graph -- the old way marked all next paths as visited so we wouldn't explore them
                         else bfsGood frontier (maxPressure, minutesLeftAtMax) graph
             
                 -- set max pressure

@@ -130,3 +130,7 @@ part2 = do
 -- for part 2:
 -- only store the top n (big enough so collision detection is correct) and record the height of that
 -- ugh
+
+-- what about just storing the highest in each column?
+-- should still allow for collision detection
+-- and it requires 7 bits instead of <insert huge number here>

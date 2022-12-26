@@ -184,14 +184,13 @@ part2 = do
     -- correct solution in exchange for a longer runtime. 10000 gave me the
     -- right answer.
     let (b, heights_, rock) = ($!) allMoves (b_,[],0,moves) moves 0 iters
-    print $ head heights_
     let heights = reverse heights_
     let (rockDiff, heightDiff) = findPattern heights
-    print (rockDiff, heightDiff)
+    putStrLn $ "A difference of " ++ show rockDiff ++ " rocks leads to a difference of " ++ show heightDiff ++ " height."
     if rockDiff == -1 then putStrLn "No pattern found :(\nTry making iters bigger."
     else do
         let startRockNum = 1000000000000 `mod` rockDiff
         let numberOfDiffs = 1000000000000 `div` rockDiff -- div rounds down which is what we want
         let heightToAdd = numberOfDiffs * heightDiff
         let initialHeight = heights !! startRockNum
-        putStrLn $ show $ initialHeight + heightToAdd - 1 -- not sure why there is an off by one error here but -1 works...
+        putStrLn $ (++) "Answer: " $ show $ initialHeight + heightToAdd - 1 -- not sure why there is an off by one error here but -1 works...

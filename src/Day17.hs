@@ -4,7 +4,7 @@ import Utilities
 import Debug.Trace
 import qualified Data.Map as Map
 import Data.Maybe
-import qualified Day17_part2
+import qualified Day17_part2_actual
 
 -- tetris :)
 
@@ -156,4 +156,4 @@ part1 = do
     let (b, height) = doMoves (b_,0,moves) moves 0 2022
     print height
 
-part2 = Day17_part2.part2
+part2 = Day17_part2_actual.part2

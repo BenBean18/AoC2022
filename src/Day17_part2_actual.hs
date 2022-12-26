@@ -1,4 +1,4 @@
-module Day17_part2 where
+module Day17_part2_actual where
 
 import Utilities
 import Debug.Trace
@@ -150,38 +150,48 @@ allMoves (b,hs,h,moves) origMoves rockIndex rockNum = {-(traceShow $ boardDiff b
         (newB,newH,newMoves) = (doMove b (getRock rockIndex) (tail newMoveList) (head newMoveList) Point { x = 2, y = h+3 }) in
     allMoves (newB, newH:hs, max newH h, newMoves) origMoves ((rockIndex + 1) `mod` 5) (rockNum-1))
 
+-- map: index = number of rocks, value = height
+doesAPatternExist' :: Int -> Int -> [Int] -> Int
+doesAPatternExist' difference current l =
+    let size = length l in
+        if current >= size then -1
+        else if current + difference >= size then (l !! (current) - l !! (current - difference))
+        else
+            let diffHeight = (l !! (current + difference) - l !! current) in
+                    if diffHeight == doesAPatternExist' difference (current + difference) l then diffHeight else -1
+
+doesAPatternExist difference l = doesAPatternExist' difference difference l
+
+-- returns (rock difference, height difference)
+findPattern' :: Int -> [Int] -> (Int, Int)
+findPattern' i l =
+    if length l <= i * 2 then (-1, -1)
+    else
+        let diff = doesAPatternExist i l in
+            if diff == -1 then findPattern' (i+1) l
+            else (i, diff)
+
+findPattern m = findPattern' 1 m
+
+-- See the bottom of this spreadsheet for my logic:
+-- https://docs.google.com/spreadsheets/d/10m9ZiCsxk_1mgQaOws1UkGjhU-9_88d_tVBFFOngnPI/edit
+
 part2 = do
     lines <- getLines "day17/input.txt"
     let moves = head lines
     let b_ = emptyBoard (Board [] 0) 100 -- 100 high
-    let (b, heights, rock) = ($!) allMoves (b_,[],0,moves) moves 0 60000
-    putStr $ foldl (\s (height,idx) -> s ++ show idx ++ "," ++ show height ++ "\n") "" (zip heights (reverse [0..60000]))
-
--- for part 2:
--- only store the top n (big enough so collision detection is correct) and record the height of that
--- ugh
-
--- what about just storing the highest in each column?
--- should still allow for collision detection
--- and it requires 7 bits instead of <insert huge number here>
-
--- what we actually need: height of the tower
--- we don't need to simulate the whole shebang
-
--- 1514285714288
--- ... looks familiar
--- 1/7 = 0.142857142857142857...
--- 4/7 = 0.571428...
--- and the chamber is 7 wide...
-
-{-
-you can scramble 142857 by multiplying it by 1-6!
-
--}
--- (using sample input)
--- 1 iter -> 1
--- 100 iters -> 157
--- 1000 iters -> 1520
--- 10000 iters -> 15148
--- interesting
--- 
+    let iters = 10000 -- increasing this leads to a higher probability of a
+    -- correct solution in exchange for a longer runtime. 10000 gave me the
+    -- right answer.
+    let (b, heights_, rock) = ($!) allMoves (b_,[],0,moves) moves 0 iters
+    print $ head heights_
+    let heights = reverse heights_
+    let (rockDiff, heightDiff) = findPattern heights
+    print (rockDiff, heightDiff)
+    if rockDiff == -1 then putStrLn "No pattern found :(\nTry making iters bigger."
+    else do
+        let startRockNum = 1000000000000 `mod` rockDiff
+        let numberOfDiffs = 1000000000000 `div` rockDiff -- div rounds down which is what we want
+        let heightToAdd = numberOfDiffs * heightDiff
+        let initialHeight = heights !! startRockNum
+        putStrLn $ show $ initialHeight + heightToAdd - 1 -- not sure why there is an off by one error here but -1 works...

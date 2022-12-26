@@ -39,6 +39,21 @@ getRock 3 = [[True],
 getRock 4 = [[True,True],
              [True,True]]
 
+highest :: Rock -> [Int]
+highest [[True,True,True,True]] = [1,1,1,1]
+highest [[False,True,False],
+             [True,True,True],
+             [False,True,False]] = [2,3,2]
+highest [[False,False,True],
+             [False,False,True],
+             [True,True,True]] = [1,1,3]
+highest [[True],
+             [True],
+             [True],
+             [True]] = [4]
+highest [[True,True],
+             [True,True]] = [2,2]
+
 rockHeight rock = length rock
 rockWidth rock = length $ head rock
 bottomRow rock = last rock
@@ -57,6 +72,12 @@ addRockToBoard board rock Point { x = x_, y = y_ } =
         oldPrefix = (take x_ (getRow board y_))
         oldSuffix = (drop (x_ + rockWidth rock) (getRow board y_)) in
     addRockToBoard (setRow board y_ (oldPrefix ++ (orList (bottomRow rock) oldRock) ++ oldSuffix)) (init rock) Point { x = x_, y = y_ + 1 }
+
+-- addRockToBoard (Board ints) rock Point { x = x_, y = y_ } =
+--     let pre = (take x_ ints)
+--         mid_ = take (rockWidth rock) (drop x_ ints)
+--         mid = (map (\(a,b) -> max a b) (zip (map (\a -> (a + y_ - 1)) (highest rock)) mid_))
+--         last = drop (x_ + (rockWidth rock)) ints in Board (pre ++ mid ++ last)
 
 set1D :: Int -> a -> [a] -> [a]
 set1D i v l = let (ys,zs) = splitAt i l in ys ++ [v] ++ (tail zs)
@@ -82,10 +103,13 @@ showRock :: Rock -> String -> String
 showRock [] s = s
 showRock rock s = showRock (tail rock) $ s ++ showBoolList (head rock) ++ "\n"
 
+boardDiff :: Board -> [Int]
+boardDiff (Board ints) = (map (\i -> i - (minimum ints)) ints)
+
 -- move is > or < or v
 -- returns the board and the top of the rock
 doMove :: Board -> Rock -> [Move] -> Move -> Point -> (Board, Int, [Move])
-doMove board rock moves move Point { x = x_, y = y_ } = {-(trace $ if move /= 'v' then move:[] else "")-} (
+doMove board rock moves move Point { x = x_, y = y_ } = {-(traceShow $ boardDiff board)-} (
     let newPosition_ = Point { x = x_ + if move == '>' then 1 else if move == '<' then -1 else 0, y = y_ - if move == 'v' then 1 else 0 }
         newPosition = Point { x = (clamp 0 (7 - rockWidth rock) (x newPosition_)), y = (y newPosition_) }
         boardSection = map (\row -> take (rockWidth rock) $ drop (x newPosition) row) (foldl (\a x -> a ++ [x]) [] (map (getRow board) $ reverse [(y newPosition)..(y newPosition + rockHeight rock - 1)]))
@@ -102,21 +126,24 @@ backRock n = (n-1) `mod` 5
 
 doMoves :: (Board, Int, [Move]) -> [Move] -> Int -> Int -> (Board, Int, Rock)
 doMoves (b,h,_) _ rIdx 0 = (b,h,getRock (backRock rIdx))
-doMoves (b,h,moves) origMoves rockIndex rockNum = (
+doMoves (b,h,moves) origMoves rockIndex rockNum = {-(traceShow $ boardDiff b)-} (
     let currentMoveList = moves
-        newMoveList = if length currentMoveList < 10 then currentMoveList ++ origMoves else currentMoveList
+        newMoveList = if length currentMoveList < 10091 then currentMoveList ++ origMoves else currentMoveList
         (newB,newH,newMoves) = (doMove b (getRock rockIndex) (tail newMoveList) (head newMoveList) Point { x = 2, y = h+3 }) in
     doMoves (newB, max newH h, newMoves) origMoves ((rockIndex + 1) `mod` 5) (rockNum-1))
 
 -- recursive function, operates using head of input and calls itself on tail
 -- returns when 2022 high
 
+-- oh wait, this won't work. the state does depend on lower values because you could manuever around a higher block
+-- to get to a lower one.
+
 part2 = do
     lines <- getLines "day17/input.txt"
     let moves = head lines
     let b_ = Board [-1,-1,-1,-1,-1,-1,-1]
     -- always ending in ####
-    let (b, height, r) = ($!) doMoves (b_,0,moves) moves 0 1000000
+    let (b, height, r) = ($!) doMoves (b_,0,moves) moves 0 2022
     --putStrLn $ showBoard b 100 ""
     putStrLn $ showRock r ""
     print height

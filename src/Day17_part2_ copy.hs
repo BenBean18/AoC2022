@@ -1,10 +1,9 @@
-module Day17_part2 where
+module Day17_part2_ where
 
 import Utilities
 import Debug.Trace
 import qualified Data.Map as Map
 import Data.Maybe
-import Data.List (transpose)
 
 -- tetris :)
 
@@ -44,7 +43,8 @@ rockHeight rock = length rock
 rockWidth rock = length $ head rock
 bottomRow rock = last rock
 
-data Board = Board [[Bool]] Int
+data Board = Board [Int] deriving (Show)
+-- 7 wide, stores maximum height for each column
 type Move = Char
 data Point = Point { x :: Int, y :: Int } deriving (Eq, Ord, Show)
 
@@ -65,24 +65,18 @@ clamp a b v = if v < a then a else if v > b then b else v
 
 -- hopefully this is only called on length + 1 or below...
 setRow :: Board -> Int -> [Bool] -> Board
-setRow (Board bl h) y row =
-    let i = (y - h) in
-        if i == length bl then Board ((tail bl) ++ [row]) (h+1)
-        else if i > length bl then error "sadness"
-        else Board (set1D i row bl) h
+setRow (Board l) y row = Board (map (\(a,b) -> max a b) (zip (map (\x -> if x then y else -1) row) l))
 
 getRow :: Board -> Int -> [Bool]
-getRow (Board bl h) (-1) = [False,False,False,False,False,False,False]
-getRow (Board bl h) y =
-    let i = (y - h)
-        val = if i < length bl then bl !! i else [False,False,False,False,False,False,False] in val
+getRow (Board l) (-1) = [False,False,False,False,False,False,False]
+getRow (Board l) y = map ((<=) y) l
 
 showBoolList :: [Bool] -> String
 showBoolList bools = map (\b -> if b then '#' else '.') bools
 
-showBoard :: Board -> Int -> String -> String
-showBoard _ (-1) s = s
-showBoard board height s = showBoard board (height-1) $ s ++ showBoolList (getRow board height) ++ "\n"
+-- showBoard :: Board -> Int -> String -> String
+-- showBoard _ (-1) s = s
+-- showBoard board height s = showBoard board (height-1) $ s ++ showBoolList (getRow board (getHeight board + height)) ++ "\n"
 
 showRock :: Rock -> String -> String
 showRock [] s = s
@@ -108,7 +102,7 @@ backRock n = (n-1) `mod` 5
 
 doMoves :: (Board, Int, [Move]) -> [Move] -> Int -> Int -> (Board, Int, Rock)
 doMoves (b,h,_) _ rIdx 0 = (b,h,getRock (backRock rIdx))
-doMoves (b,h,moves) origMoves rockIndex rockNum = {-(traceShow $ boardDiff b)-} (
+doMoves (b,h,moves) origMoves rockIndex rockNum = (
     let currentMoveList = moves
         newMoveList = if length currentMoveList < 10 then currentMoveList ++ origMoves else currentMoveList
         (newB,newH,newMoves) = (doMove b (getRock rockIndex) (tail newMoveList) (head newMoveList) Point { x = 2, y = h+3 }) in
@@ -117,45 +111,16 @@ doMoves (b,h,moves) origMoves rockIndex rockNum = {-(traceShow $ boardDiff b)-} 
 -- recursive function, operates using head of input and calls itself on tail
 -- returns when 2022 high
 
-maximumIndex' :: [Bool] -> Int -> Int
-maximumIndex' [] _ = 0
-maximumIndex' bools idx = 
-    if last bools then idx else maximumIndex' (init bools) (idx-1)
-
-maximumIndex bools = maximumIndex' bools (length bools - 1)
-
-boardDiff :: Board -> [Int]
-boardDiff (Board bools _) =
-    let ints = map maximumIndex $ transpose bools in (map (\i -> i - (minimum ints)) ints)
-
-emptyBoard :: Board -> Int -> Board
-emptyBoard b 0 = b
-emptyBoard (Board bl _) i = emptyBoard (Board ([False,False,False,False,False,False,False]:bl) 0) (i-1)
-
-getSize (Board l _) = length l
-getHeight (Board _ h) = h
-
--- is this linear approximation?
-
-getHeightOfRocks :: Int -> [Move] -> Int
-getHeightOfRocks m moves = 
-    let b_ = emptyBoard (Board [] 0) 100 -- 100 high
-        (_, height, _) = ($!) doMoves (b_,0,moves) moves 0 m in height
-
-allMoves :: (Board, [Int], Int, [Move]) -> [Move] -> Int -> Int -> (Board, [Int], Rock)
-allMoves (b,hs,h,_) _ rIdx 0 = (b,hs,getRock (backRock rIdx))
-allMoves (b,hs,h,moves) origMoves rockIndex rockNum = {-(traceShow $ boardDiff b)-} (
-    let currentMoveList = moves
-        newMoveList = if length currentMoveList < 10 then currentMoveList ++ origMoves else currentMoveList
-        (newB,newH,newMoves) = (doMove b (getRock rockIndex) (tail newMoveList) (head newMoveList) Point { x = 2, y = h+3 }) in
-    allMoves (newB, newH:hs, max newH h, newMoves) origMoves ((rockIndex + 1) `mod` 5) (rockNum-1))
-
 part2 = do
     lines <- getLines "day17/input.txt"
     let moves = head lines
-    let b_ = emptyBoard (Board [] 0) 100 -- 100 high
-    let (b, heights, rock) = ($!) allMoves (b_,[],0,moves) moves 0 60000
-    putStr $ foldl (\s (height,idx) -> s ++ show idx ++ "," ++ show height ++ "\n") "" (zip heights (reverse [0..60000]))
+    let b_ = Board [0,0,0,0,0,0,0]
+    -- always ending in ####
+    let (b, height, r) = ($!) doMoves (b_,0,moves) moves 0 2022
+    --putStrLn $ showBoard b 100 ""
+    putStrLn $ showRock r ""
+    print height
+    print b
 
 -- for part 2:
 -- only store the top n (big enough so collision detection is correct) and record the height of that
@@ -167,21 +132,3 @@ part2 = do
 
 -- what we actually need: height of the tower
 -- we don't need to simulate the whole shebang
-
--- 1514285714288
--- ... looks familiar
--- 1/7 = 0.142857142857142857...
--- 4/7 = 0.571428...
--- and the chamber is 7 wide...
-
-{-
-you can scramble 142857 by multiplying it by 1-6!
-
--}
--- (using sample input)
--- 1 iter -> 1
--- 100 iters -> 157
--- 1000 iters -> 1520
--- 10000 iters -> 15148
--- interesting
--- 

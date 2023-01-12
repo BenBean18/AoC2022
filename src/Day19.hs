@@ -111,12 +111,14 @@ nonOre State { robots = rs, resources = rc, minutes = mins } bp =
 -- what if prioritized by ore equivalent?
 
 priority :: State -> Int
-priority State { robots = rs, minutes = mins } = 10000 - 
+priority State { robots = rs, minutes = mins, resources = rc } = 10000 - 
     (
         (length $ filter (== (Robot Ore)) rs) +
         ((length $ (filter (== (Robot Clay)) rs)) * 2) +
-        ((length $ filter (== (Robot Obsidian)) rs) * 5) +
-        ((length $ filter (== (Robot Geode)) rs) * 10)) + mins
+        ((length $ filter (== (Robot Obsidian)) rs) * 3) +
+        ((length $ filter (== (Robot Geode)) rs) * 100)) + mins + rc Map.! Geode
+
+-- Not sure what the exit condition should be. Maybe # of iterations with that maximum?
 
 -- bfs blueprint frontier visited maximumGeodes -> maximumGeodes for "tree branches" below
 bfs :: Blueprint -> PSQ.PSQ State Int -> Set.Set State -> Int -> Int
@@ -127,8 +129,9 @@ bfs bp frontier_ visited maximumGeodes =
             state = PSQ.key state_
             neighs = filter (`notElem` visited) $ neighbors state bp
             neighPriorities = zip neighs (map priority neighs)
-            newMax = maximum (maximumGeodes:(map (\s -> (Map.!) (resources s) Geode) neighs)) in (trace $ show (minutes state) ++ " " ++ show newMax) (
-                max newMax $ bfs bp (foldl (\q (neigh, prio) -> PSQ.insert neigh prio q) frontier neighPriorities) (foldl (flip Set.insert) visited neighs) newMax)
+            newMax = maximum (maximumGeodes:(map (\s -> (Map.!) (resources s) Geode) neighs)) in (trace $ show (minutes state) ++ " " ++ show newMax ++ " " ++ show maximumGeodes) (
+                if (minutes state) == 24 && (resources state) Map.! Geode /= 0 then newMax
+                else max newMax $ bfs bp (foldl (\q (neigh, prio) -> PSQ.insert neigh prio q) frontier neighPriorities) (foldl (flip Set.insert) visited neighs) newMax)
 
 -- now it stalls at 20
 -- maybe priority queue where priority = robot count. ore worth 1, clay worth 2, 

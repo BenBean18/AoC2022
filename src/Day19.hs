@@ -7,6 +7,8 @@ import Utilities
 import Data.List.Split
 import Data.List (uncons, unzip)
 import Data.Maybe
+import qualified Data.Set as Set
+import Debug.Trace
 
 -- idea: work backwards from obsidian-collecting robot
 -- most geodes = most obsidian-collecting robots
@@ -31,7 +33,7 @@ data Robot = Robot Mineral deriving (Ord, Show, Eq)
 type Cost = Map.Map Mineral Int
 type ResourceCount = Map.Map Mineral Int
 type Blueprint = Map.Map Robot Cost
-data State = State { robots :: [Robot], resources :: ResourceCount } deriving (Eq, Show, Ord)
+data State = State { robots :: [Robot], resources :: ResourceCount, minutes :: Int } deriving (Eq, Show, Ord)
 
 mineral :: Robot -> Mineral
 mineral (Robot m) = m
@@ -44,8 +46,8 @@ addResources :: ResourceCount -> ResourceCount -> ResourceCount
 -- addResources r1 r2 = map (\k -> (r1 Map.! k) + (r2 Map.! k)) (Map.keys r1)
 addResources r1 r2 = Map.unionWith (+) r1 r2
 
-newState :: State -> Robot -> Blueprint -> State
-newState State { robots = rs, resources = rc } r bp = State { robots = r:rs, resources = rc `subtractResources` (bp Map.! r) }
+-- newState :: State -> Robot -> Blueprint -> State
+-- newState State { robots = rs, resources = rc } r bp = State { robots = r:rs, resources = rc `subtractResources` (bp Map.! r) }
 
 availableRobots :: ResourceCount -> Blueprint -> [Robot] -> [Robot]
 availableRobots rc bp rs = filter (\robot -> (length $ filter (< 0) (Map.elems $ subtractResources rc (bp Map.! robot))) == 0) rs
@@ -54,13 +56,14 @@ mineralsToRC :: [Mineral] -> ResourceCount
 mineralsToRC ms = Map.fromListWith (+) (map (\x -> (x, 1)) ms)
 
 neighbors :: State -> Blueprint -> [State]
-neighbors State { robots = rs, resources = rc } bp = 
+neighbors State { minutes = 24 } _ = [] -- likely needs to be changed for part 2
+neighbors State { robots = rs, resources = rc, minutes = mins } bp = 
     let newResources = addResources rc $ mineralsToRC $ map mineral rs
         newRobotPossibilities = availableRobots newResources bp [Robot Ore, Robot Clay, Robot Obsidian, Robot Geode] in
             -- 1. find robots which can be created (mineral count > mineral need)
             -- 2. get states with those robots
             -- there is also the state where just collection happens
-            State { robots = rs, resources = newResources } : map (\robot -> State { robots = robot:rs, resources = subtractResources newResources (bp Map.! robot) }) newRobotPossibilities -- ugh, need to subtract resources from newResources for every robot...
+            State { robots = rs, resources = newResources, minutes = mins + 1 } : map (\robot -> State { robots = robot:rs, resources = subtractResources newResources (bp Map.! robot), minutes = mins + 1 }) newRobotPossibilities -- ugh, need to subtract resources from newResources for every robot...
 
 stringToMineral :: String -> Mineral
 stringToMineral "ore" = Ore
@@ -94,14 +97,29 @@ parseBlueprint (l:ls) blueprint =
 emptyRC :: ResourceCount
 emptyRC = Map.fromList [(Ore, 0), (Clay, 0), (Obsidian, 0), (Geode, 0)]
 
+-- bfs blueprint frontier visited maximumGeodes -> maximumGeodes for "tree branches" below
+bfs :: Blueprint -> [State] -> Set.Set State -> Int -> Int
+bfs bp frontier_ visited maximumGeodes =
+    let (state:frontier) = frontier_
+        neighs = filter (`notElem` visited) $ neighbors state bp
+        newMax = maximum (maximumGeodes:(map (\s -> (Map.!) (resources s) Geode) neighs)) in (traceShow $ minutes state) (
+            if length neighs == 0 then newMax
+            else max newMax $ bfs bp (frontier ++ neighs) (foldl (flip Set.insert) visited neighs) newMax)
+
+
+
+-- need a way to cut the search space, it grows exponentially... :/
+
 part1 = do
     lines_ <- getLines "day19/input.txt"
     let raw = map (splitOneOf ":.") lines_
     let (ids, prints_) = unzip $ map (fromJust . uncons) raw
     let prints = map init prints_
     let blueprints = map (flip parseBlueprint $ Map.empty) prints
-    let neighborsOfFirst = neighbors (State { robots = [Robot Ore], resources = Map.insert Ore 2 emptyRC }) (head blueprints)
-    print $ neighborsOfFirst
+    let rootState = State { robots = [Robot Ore], resources = emptyRC, minutes = 0 }
+    let neighborsOfFirst = neighbors rootState (head blueprints)
+    print $ filter (`notElem` (Set.singleton rootState)) $ neighbors rootState (head blueprints)
+    print $ bfs (head blueprints) [rootState] (Set.singleton rootState) 0
     -- let bp = head blueprints
     -- print $ (length $ filter (>= 0) (Map.elems $ subtractResources (Map.fromList [(Ore, 4)]) (bp Map.! Robot Ore))) > 0
     -- print $ addResources Map.empty $ mineralsToRC $ map mineral [Robot Ore]

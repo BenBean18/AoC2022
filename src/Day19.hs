@@ -9,6 +9,7 @@ import Data.List (uncons, unzip)
 import Data.Maybe
 import qualified Data.Set as Set
 import Debug.Trace
+import qualified Data.PSQueue as PSQ
 
 -- idea: work backwards from obsidian-collecting robot
 -- most geodes = most obsidian-collecting robots
@@ -97,16 +98,40 @@ parseBlueprint (l:ls) blueprint =
 emptyRC :: ResourceCount
 emptyRC = Map.fromList [(Ore, 0), (Clay, 0), (Obsidian, 0), (Geode, 0)]
 
+nonOre :: State -> Blueprint -> [State]
+nonOre State { minutes = 24 } _ = [] -- likely needs to be changed for part 2
+nonOre State { robots = rs, resources = rc, minutes = mins } bp = 
+    let newResources = addResources rc $ mineralsToRC $ map mineral rs
+        newRobotPossibilities = availableRobots newResources bp [Robot Clay, Robot Obsidian, Robot Geode] in
+            -- 1. find robots which can be created (mineral count > mineral need)
+            -- 2. get states with those robots
+            -- there is also the state where just collection happens
+            State { robots = rs, resources = newResources, minutes = mins + 1 } : map (\robot -> State { robots = robot:rs, resources = subtractResources newResources (bp Map.! robot), minutes = mins + 1 }) newRobotPossibilities -- ugh, need to subtract resources from newResources for every robot...
+
+-- what if prioritized by ore equivalent?
+
+priority :: State -> Int
+priority State { robots = rs, minutes = mins } = 10000 - 
+    (
+        (length $ filter (== (Robot Ore)) rs) +
+        ((length $ (filter (== (Robot Clay)) rs)) * 2) +
+        ((length $ filter (== (Robot Obsidian)) rs) * 5) +
+        ((length $ filter (== (Robot Geode)) rs) * 10)) + mins
+
 -- bfs blueprint frontier visited maximumGeodes -> maximumGeodes for "tree branches" below
-bfs :: Blueprint -> [State] -> Set.Set State -> Int -> Int
+bfs :: Blueprint -> PSQ.PSQ State Int -> Set.Set State -> Int -> Int
 bfs bp frontier_ visited maximumGeodes =
-    let (state:frontier) = frontier_
-        neighs = filter (`notElem` visited) $ neighbors state bp
-        newMax = maximum (maximumGeodes:(map (\s -> (Map.!) (resources s) Geode) neighs)) in (traceShow $ minutes state) (
-            if length neighs == 0 then newMax
-            else max newMax $ bfs bp (frontier ++ neighs) (foldl (flip Set.insert) visited neighs) newMax)
+    if PSQ.null frontier_ then maximumGeodes
+    else
+        let Just (state_, frontier) = PSQ.minView frontier_
+            state = PSQ.key state_
+            neighs = filter (`notElem` visited) $ neighbors state bp
+            neighPriorities = zip neighs (map priority neighs)
+            newMax = maximum (maximumGeodes:(map (\s -> (Map.!) (resources s) Geode) neighs)) in (trace $ show (minutes state) ++ " " ++ show newMax) (
+                max newMax $ bfs bp (foldl (\q (neigh, prio) -> PSQ.insert neigh prio q) frontier neighPriorities) (foldl (flip Set.insert) visited neighs) newMax)
 
-
+-- now it stalls at 20
+-- maybe priority queue where priority = robot count. ore worth 1, clay worth 2, 
 
 -- need a way to cut the search space, it grows exponentially... :/
 
@@ -119,7 +144,7 @@ part1 = do
     let rootState = State { robots = [Robot Ore], resources = emptyRC, minutes = 0 }
     let neighborsOfFirst = neighbors rootState (head blueprints)
     print $ filter (`notElem` (Set.singleton rootState)) $ neighbors rootState (head blueprints)
-    print $ bfs (head blueprints) [rootState] (Set.singleton rootState) 0
+    print $ bfs (head blueprints) (PSQ.singleton rootState 0) (Set.singleton rootState) 0
     -- let bp = head blueprints
     -- print $ (length $ filter (>= 0) (Map.elems $ subtractResources (Map.fromList [(Ore, 4)]) (bp Map.! Robot Ore))) > 0
     -- print $ addResources Map.empty $ mineralsToRC $ map mineral [Robot Ore]

@@ -66,9 +66,9 @@ neighbors :: State -> Blueprint -> Int -> Int -> [State]
 neighbors State { minutes = 24 } _ _ _ = [] -- likely needs to be changed for part 2
 neighbors State { robots = rs, resources = rc, minutes = mins } bp maxGeodes maxGeodeMins =
     let newResources = addResources rc $ mineralsToRC $ map mineral (MultiSet.toList rs)
-        newRobotPossibilities = availableRobots rc bp [Robot Ore, Robot Clay, Robot Obsidian, Robot Geode]
+        newRobotPossibilities = filter (\robot -> (resourcesProducedByRobot robot (mins+1) Map.! mineral robot) > Map.findWithDefault 0 (mineral robot) (bp Map.! robot)) $
+            availableRobots rc bp [Robot Ore, Robot Clay, Robot Obsidian, Robot Geode]
         newState = State { robots = rs, resources = newResources, minutes = mins + 1 } in
-
             newState:map (\robot -> State { robots = MultiSet.insert robot rs, resources = subtractResources newResources (bp Map.! robot), minutes = mins + 1 }) newRobotPossibilities
 
 
@@ -113,22 +113,26 @@ minusOneRC = Map.fromList [(Ore, -1), (Clay, -1), (Obsidian, -1), (Geode, -1)]
 oreEquivalent :: Blueprint -> Mineral -> Int
 oreEquivalent bp Ore = 1
 oreEquivalent bp m =
-    sum (zipWith (*) (map (oreEquivalent bp) (Map.keys $ bp Map.! Robot m)) (Map.elems $ bp Map.! Robot m))
+    sum (zipWith (^) (map (oreEquivalent bp) (Map.keys $ bp Map.! Robot m)) (Map.elems $ bp Map.! Robot m))
 
 oreEquivalentMap :: Blueprint -> ResourceCount -> Int
-oreEquivalentMap bp m = sum (zipWith (*) (map (oreEquivalent bp) (Map.keys m)) (Map.elems m))
+oreEquivalentMap bp m = sum (zipWith (^) (map (oreEquivalent bp) (Map.keys m)) (Map.elems m))
 
 -- true if a's resources are all >= b's resources for each type
 -- NOPE! This check is too simple. 1 ore, 7 clay, 1 obsidian should be better than 1 ore, 10 clay, 0 obsidian
 -- has doesn't is automatic yes
+-- can we ignore clay since it doesn't directly factor into geode robots? i don't think so
 resourcesBetter :: ResourceCount -> ResourceCount -> Blueprint -> Bool
 resourcesBetter a b bp =
-    all (>= 0) (Map.elems $ subtractResources a b) || all (== 0) (Map.elems $ subtractResources a b)
+    (highestResource b <= highestResource a) &&
+    (not (all (<= 0) (Map.elems $ subtractResources a b)) ||
+    all (== 0) (Map.elems $ subtractResources a b))
+    && ((b Map.! Geode) <= (a Map.! Geode))
 
 robotsBetter :: MultiSet.MultiSet Robot -> MultiSet.MultiSet Robot -> Bool
 robotsBetter a b =
     let diff = Map.unionWith (-) (Map.fromList (MultiSet.toOccurList a)) (Map.fromList (MultiSet.toOccurList b)) in
-        (not (all (< 0) $ Map.elems $ diff)) || (all (== 0) $ Map.elems $ diff)
+        (not (all (<= 0) $ Map.elems $ diff)) || (all (== 0) $ Map.elems $ diff)
 
 -- ok so
 -- when would we not want to buy a new-resource-type robot
@@ -163,12 +167,39 @@ the third one should be eliminated based on the first one
 do we really have to check all other same-robot states?
 -}
 
+-- one of these should not be considered
+-- State {robots = fromOccurList [(Robot Ore,6),(Robot Clay,8)], resources = fromList [(Ore,18),(Clay,42),(Obsidian,0),(Geode,0)], minutes = 18}
+-- State {robots = fromOccurList [(Robot Ore,6),(Robot Clay,7)], resources = fromList [(Ore,21),(Clay,42),(Obsidian,0),(Geode,0)], minutes = 18}
+
+-- this is dumb... built another robot and have less of the resource
+{-
+State {robots = fromOccurList [(Robot Ore,7),(Robot Clay,8)], resources = fromList [(Ore,24),(Clay,64),(Obsidian,0),(Geode,0)], minutes = 21}
+State {robots = fromOccurList [(Robot Ore,8),(Robot Clay,8)], resources = fromList [(Ore,20),(Clay,64),(Obsidian,0),(Geode,0)], minutes = 21}
+-}
+
+-- so if cost > total benefit it's not worth it, but that only applies to late minutes
+
+-- State {robots = fromOccurList [(Robot Ore,6),(Robot Clay,5),(Robot Obsidian,4),(Robot Geode,1)], resources = fromList [(Ore,25),(Clay,30),(Obsidian,17),(Geode,3)], minutes = 21}
+-- State {robots = fromOccurList [(Robot Ore,6),(Robot Clay,5),(Robot Obsidian,4),(Robot Geode,2)], resources = fromList [(Ore,22),(Clay,30),(Obsidian,5),(Geode,3)], minutes = 21}
+-- here we want to pick the second state because same amount of resources corresponding to one robot type but more robots (geodes in this case)
+-- so if during one specific minute robot count is greater and resource count is equal then that is very good
+
 highestRobot :: MultiSet.MultiSet Robot -> Robot
 highestRobot set
   | MultiSet.member (Robot Geode) set = Robot Geode
   | MultiSet.member (Robot Obsidian) set = Robot Obsidian
   | MultiSet.member (Robot Clay) set = Robot Clay
   | otherwise = Robot Ore
+
+highestResource :: ResourceCount -> Mineral
+highestResource map
+  | (Map.!) map Geode > 0 = Geode
+  | (Map.!) map Obsidian > 0 = Obsidian
+  | (Map.!) map Clay > 0 = Clay
+  | otherwise = Ore
+
+resourcesProducedByRobot :: Robot -> Int -> ResourceCount
+resourcesProducedByRobot (Robot mineral) minutes = Map.insert mineral (24 - minutes) emptyRC
 
 -- bfs blueprint frontier visited maximumGeodes -> maximumGeodes for "tree branches" below
 -- the map: key = (robots, minutes), value = (resources)
@@ -177,15 +208,15 @@ bfs bp frontier_ visited maximumGeodes maxGeodeMins lastMins robotResourceMap re
     if null frontier_ then trace "frontier empty" maximumGeodes
     else
         let (state:frontier) = frontier_ in
-            if not (all (\s -> resourcesBetter (resources state) s bp) (Map.findWithDefault [minusOneRC] (robots state, minutes state) robotResourceMap)) then {-(trace $ "rejected " ++ show (Map.findWithDefault minusOneRC (robots state, minutes state) robotResourceMap) ++ " " ++ show state)-}
+            if not (all (\s -> resourcesBetter (resources state) s bp) (Map.findWithDefault [] (robots state, minutes state) robotResourceMap)) then {-(trace $ "rejected " ++ show (Map.findWithDefault minusOneRC (robots state, minutes state) robotResourceMap) ++ " " ++ show state)-}
                 bfs bp frontier (Set.insert state visited) maximumGeodes maxGeodeMins lastMins robotResourceMap resourceRobotMap highestRobotMap
             else if not (robotsBetter (robots state) (Map.findWithDefault MultiSet.empty (resources state, minutes state) resourceRobotMap)) then
                 bfs bp frontier (Set.insert state visited) maximumGeodes maxGeodeMins lastMins robotResourceMap resourceRobotMap highestRobotMap
             else
                 -- well I was using `notElem` instead of `Set.notMember`... caused a **huge** slowdown converting to list
-                let origNeighs = {-filter (`Set.notMember` visited) $-}
+                let origNeighs = filter (`Set.notMember` visited) $
                         neighbors state bp maximumGeodes maxGeodeMins
-                    resourceNeighs = filter (\st -> all (\s -> resourcesBetter (resources st) s bp) (Map.findWithDefault [minusOneRC] (robots st, minutes st) robotResourceMap)) origNeighs
+                    resourceNeighs = filter (\st -> all (\s -> resourcesBetter (resources st) s bp) (Map.findWithDefault [] (robots st, minutes st) robotResourceMap)) origNeighs
                     robotNeighs = filter (\s -> robotsBetter (robots s) (Map.findWithDefault MultiSet.empty (resources s, minutes s) resourceRobotMap)) origNeighs
                     neighs = filter (\s -> robotsBetter (robots s) (Map.findWithDefault MultiSet.empty (resources s, minutes s) resourceRobotMap)) resourceNeighs
                         -- filter (\s -> MultiSet.member (Map.findWithDefault (Robot Ore) (minutes s) highestRobotMap) (robots s)) $
@@ -219,7 +250,7 @@ part1 = do
     let blueprints = map (`parseBlueprint` Map.empty) prints
     let rootState = State { robots = MultiSet.fromList [Robot Ore], resources = emptyRC, minutes = 0 } -- should probably be zero
     let neighborsOfFirst = neighbors rootState (head blueprints)
-    let maxGeodes = map (\bp -> bfs bp [rootState] (Set.singleton rootState) 1 0 0 Map.empty Map.empty Map.empty) blueprints
+    let maxGeodes = map (\bp -> bfs bp [rootState] (Set.singleton rootState) 0 0 0 Map.empty Map.empty Map.empty) blueprints
     let qualityLevels = zipWith (*) [1..(length maxGeodes)] maxGeodes
     print (head blueprints)
     print maxGeodes
@@ -235,3 +266,6 @@ part1 = do
 -- 3751 high
 -- 3600 high
 -- 2802 high
+-- 1184 high
+-- 1031 low
+-- 1076?

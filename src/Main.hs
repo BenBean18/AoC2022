@@ -17,6 +17,7 @@ import qualified Day16
 import qualified Day17
 import qualified Day18
 import qualified Day19
+import qualified Day19_part2
 
 main :: IO ()
 main = do
@@ -58,6 +59,7 @@ main = do
                     else if day == 16 then Day16.part2
                     else if day == 17 then Day17.part2
                     else if day == 18 then Day18.part2
+                    else if day == 19 then Day19_part2.part2
                     else putStrLn "I haven't solved that yet (or it doesn't exist)"
                 else if part == "v" then
                     if day == 7 then Day7.vis

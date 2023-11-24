@@ -123,7 +123,7 @@ oreEquivalentMap bp m = sum (zipWith (*) (map (oreEquivalent bp) (Map.keys m)) (
 -- has doesn't is automatic yes
 resourcesBetter :: ResourceCount -> ResourceCount -> Blueprint -> Bool
 resourcesBetter a b bp =
-    (not (all (<= 0) $ Map.elems $ subtractResources a b)) || (all (== 0) $ Map.elems $ subtractResources a b)
+    all (>= 0) (Map.elems $ subtractResources a b) || all (== 0) (Map.elems $ subtractResources a b)
 
 robotsBetter :: MultiSet.MultiSet Robot -> MultiSet.MultiSet Robot -> Bool
 robotsBetter a b =
@@ -177,15 +177,15 @@ bfs bp frontier_ visited maximumGeodes maxGeodeMins lastMins robotResourceMap re
     if null frontier_ then trace "frontier empty" maximumGeodes
     else
         let (state:frontier) = frontier_ in
-            if not (all (\s -> resourcesBetter (resources state) s bp) (Map.findWithDefault [] (robots state, minutes state) robotResourceMap)) then {-(trace $ "rejected " ++ show (Map.findWithDefault minusOneRC (robots state, minutes state) robotResourceMap) ++ " " ++ show state)-}
+            if not (all (\s -> resourcesBetter (resources state) s bp) (Map.findWithDefault [minusOneRC] (robots state, minutes state) robotResourceMap)) then {-(trace $ "rejected " ++ show (Map.findWithDefault minusOneRC (robots state, minutes state) robotResourceMap) ++ " " ++ show state)-}
                 bfs bp frontier (Set.insert state visited) maximumGeodes maxGeodeMins lastMins robotResourceMap resourceRobotMap highestRobotMap
             else if not (robotsBetter (robots state) (Map.findWithDefault MultiSet.empty (resources state, minutes state) resourceRobotMap)) then
                 bfs bp frontier (Set.insert state visited) maximumGeodes maxGeodeMins lastMins robotResourceMap resourceRobotMap highestRobotMap
             else
                 -- well I was using `notElem` instead of `Set.notMember`... caused a **huge** slowdown converting to list
-                let origNeighs = filter (`Set.notMember` visited) $
+                let origNeighs = {-filter (`Set.notMember` visited) $-}
                         neighbors state bp maximumGeodes maxGeodeMins
-                    resourceNeighs = filter (\st -> all (\s -> resourcesBetter (resources state) s bp) (Map.findWithDefault [] (robots st, minutes st) robotResourceMap)) origNeighs
+                    resourceNeighs = filter (\st -> all (\s -> resourcesBetter (resources st) s bp) (Map.findWithDefault [minusOneRC] (robots st, minutes st) robotResourceMap)) origNeighs
                     robotNeighs = filter (\s -> robotsBetter (robots s) (Map.findWithDefault MultiSet.empty (resources s, minutes s) resourceRobotMap)) origNeighs
                     neighs = filter (\s -> robotsBetter (robots s) (Map.findWithDefault MultiSet.empty (resources s, minutes s) resourceRobotMap)) resourceNeighs
                         -- filter (\s -> MultiSet.member (Map.findWithDefault (Robot Ore) (minutes s) highestRobotMap) (robots s)) $
@@ -198,7 +198,7 @@ bfs bp frontier_ visited maximumGeodes maxGeodeMins lastMins robotResourceMap re
                                                     (Map.fromList (map (\s -> ((resources s, minutes s), robots s)) robotNeighs))
                                                     resourceRobotMap
                     newHighestRobotMap = {-Map.insert (minutes state + 1) (max (maximum (map (\m -> Map.findWithDefault (Robot Ore) m highestRobotMap) [0..(minutes state + 1)])) (maximum (Robot Ore:map (highestRobot . robots) neighs)))-} highestRobotMap
-                    in (trace $ show state ++ " " ++ show (Map.findWithDefault [] (robots state, minutes state) robotResourceMap)) (
+                    in (trace $ show state{- ++ " " ++ show (Map.findWithDefault [] (robots state, minutes state) robotResourceMap)-}) (
                     if newMax > maximumGeodes || (newMax == maximumGeodes && minutes state == 24) then {-(trace $ show state)-}
                         (max newMax $ bfs bp (frontier ++ neighs) newSet newMax (minutes state) (minutes state) newRobotResourceMap newResourceRobotMap newHighestRobotMap)
 

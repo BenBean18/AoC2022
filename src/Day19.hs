@@ -128,9 +128,26 @@ resourcesBetter a b bp =
 robotsBetter :: MultiSet.MultiSet Robot -> MultiSet.MultiSet Robot -> Bool
 robotsBetter a b =
     let diff = Map.unionWith (-) (Map.fromList (MultiSet.toOccurList a)) (Map.fromList (MultiSet.toOccurList b)) in
-        (not (all (<= 0) $ Map.elems $ diff)) || (all (== 0) $ Map.elems $ diff)
+        (not (all (< 0) $ Map.elems $ diff)) || (all (== 0) $ Map.elems $ diff)
 
--- if fewer robot types than other don't explore the state
+-- ok so
+-- when would we not want to buy a new-resource-type robot
+-- since this fails on example 2
+-- potentially buying two obsidian robots before a geode robot is good
+-- Blueprint 2: Each ore robot costs 2 ore. Each clay robot costs 3 ore. Each obsidian robot costs 3 ore and 8 clay. Each geode robot costs 3 ore and 12 obsidian.
+-- since 12 obsidian is a lot
+-- if this can be turned into a shortest path finder through the state graph that's REALLY good
+-- wait maybe you can? movement cost equals cost of buying robot
+-- but then it would do nothing since that's the lowest cost move
+-- is this like the lanternfish?
+-- also maybe there is a way to evaluate the state to minute 24 right when you create a robot
+-- like adding all the resources you would collect since that's invariant
+-- so what if it is shortest-path where movement cost is like benefit to cost ratio
+-- total resources generated
+
+-- what can we safely assume
+-- 1. if two states have the same robots, choose the one with more resources
+-- 2. if two states have the same resources, choose the one with more robots
 
 highestRobot :: MultiSet.MultiSet Robot -> Robot
 highestRobot set
@@ -146,26 +163,27 @@ bfs bp frontier_ visited maximumGeodes maxGeodeMins lastMins robotResourceMap re
     if null frontier_ then trace "frontier empty" maximumGeodes
     else
         let (state:frontier) = frontier_ in
-            {-if not (resourcesBetter (resources state) (Map.findWithDefault minusOneRC (robots state, minutes state) robotResourceMap) bp) then {-(trace $ "rejected " ++ show (Map.findWithDefault minusOneRC (robots state, minutes state) robotResourceMap) ++ " " ++ show state)-}
+            if not (resourcesBetter (resources state) (Map.findWithDefault minusOneRC (robots state, minutes state) robotResourceMap) bp) then {-(trace $ "rejected " ++ show (Map.findWithDefault minusOneRC (robots state, minutes state) robotResourceMap) ++ " " ++ show state)-}
                 bfs bp frontier (Set.insert state visited) maximumGeodes maxGeodeMins lastMins robotResourceMap resourceRobotMap highestRobotMap
             else if not (robotsBetter (robots state) (Map.findWithDefault MultiSet.empty (resources state, minutes state) resourceRobotMap)) then
                 bfs bp frontier (Set.insert state visited) maximumGeodes maxGeodeMins lastMins robotResourceMap resourceRobotMap highestRobotMap
-            else-}
+            else
                 -- well I was using `notElem` instead of `Set.notMember`... caused a **huge** slowdown converting to list
-                let neighs = {-filter (\s -> resourcesBetter (resources s) (Map.findWithDefault minusOneRC (robots s, minutes s) robotResourceMap) bp ) $
-                        filter (\s -> robotsBetter (robots s) (Map.findWithDefault MultiSet.empty (resources s, minutes s) resourceRobotMap)) $-}
-                        filter (\s -> MultiSet.member (Map.findWithDefault (Robot Ore) (minutes s) highestRobotMap) (robots s)) $
-                        filter (`Set.notMember` visited) $
+                let origNeighs = filter (`Set.notMember` visited) $
                         neighbors state bp maximumGeodes maxGeodeMins
+                    resourceNeighs = filter (\s -> resourcesBetter (resources s) (Map.findWithDefault minusOneRC (robots s, minutes s) robotResourceMap) bp ) origNeighs
+                    robotNeighs = filter (\s -> robotsBetter (robots s) (Map.findWithDefault MultiSet.empty (resources s, minutes s) resourceRobotMap)) origNeighs
+                    neighs = filter (\s -> robotsBetter (robots s) (Map.findWithDefault MultiSet.empty (resources s, minutes s) resourceRobotMap)) resourceNeighs
+                        -- filter (\s -> MultiSet.member (Map.findWithDefault (Robot Ore) (minutes s) highestRobotMap) (robots s)) $
                     newMax = max maximumGeodes $ (Map.!) (resources state) Geode
                     newSet = foldl (flip Set.insert) visited neighs
-                    newRobotResourceMap = {-Map.union
-                                                    (Map.fromList (map (\s -> ((robots s, minutes s), resources s)) neighs))
-                                                    (if lastMins == minutes state then robotResourceMap else trace ("Now on minute " ++ show (minutes state) ++ " " ++ show state ++ " " ++ show (Map.size robotResourceMap)) robotResourceMap)-}robotResourceMap
-                    newResourceRobotMap = {-Map.union
-                                                    (Map.fromList (map (\s -> ((resources s, minutes s), robots s)) neighs))-}
+                    newRobotResourceMap = Map.union
+                                                    (Map.fromList (map (\s -> ((robots s, minutes s), resources s)) resourceNeighs))
+                                                    (if lastMins == minutes state then robotResourceMap else trace ("Now on minute " ++ show (minutes state) ++ " " ++ show state ++ " " ++ show (Map.size robotResourceMap)) robotResourceMap)
+                    newResourceRobotMap = Map.union
+                                                    (Map.fromList (map (\s -> ((resources s, minutes s), robots s)) robotNeighs))
                                                     resourceRobotMap
-                    newHighestRobotMap = Map.insert (minutes state + 1) (max (maximum (map (\m -> Map.findWithDefault (Robot Ore) m highestRobotMap) [0..(minutes state + 1)])) (maximum (Robot Ore:map (highestRobot . robots) neighs))) highestRobotMap
+                    newHighestRobotMap = {-Map.insert (minutes state + 1) (max (maximum (map (\m -> Map.findWithDefault (Robot Ore) m highestRobotMap) [0..(minutes state + 1)])) (maximum (Robot Ore:map (highestRobot . robots) neighs)))-} highestRobotMap
                     in (trace $ show state) (
                     if newMax > maximumGeodes || (newMax == maximumGeodes && minutes state == 24) then {-(trace $ show state)-}
                         (max newMax $ bfs bp (frontier ++ neighs) newSet newMax (minutes state) (minutes state) newRobotResourceMap newResourceRobotMap newHighestRobotMap)
